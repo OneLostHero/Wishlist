@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lickity's Wish List</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;600;800&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --ground: #eef0f2;     /* cool light gray page */
+    --card: #ffffff;
+    --ink: #21242a;
+    --muted: #6b7280;
+    --accent: #d1495b;     /* raspberry, carried over from v1 */
+    --tag-paper: #faf6ec;  /* the little price tag */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Karla", sans-serif;
+    padding: 3rem 1.25rem 4rem;
+    min-height: 100vh;
+  }
+
+  header {
+    max-width: 620px;
+    margin: 0 auto 2.75rem;
+    text-align: center;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  header p {
+    margin-top: 0.8rem;
+    color: var(--muted);
+    font-size: 1.05rem;
+    line-height: 1.55;
+  }
+  header p strong { color: var(--ink); }
+
+  .grid {
+    max-width: 1040px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+  }
+
+  /* Items live in items.csv — see README.md for the format. */
+
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(33,36,42,0.08), 0 8px 24px rgba(33,36,42,0.07);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 2px 4px rgba(33,36,42,0.08), 0 14px 32px rgba(33,36,42,0.12);
+  }
+
+  .card img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    display: block;
+    background: var(--ground);
+  }
+
+  .card .body {
+    padding: 1.1rem 1.2rem 1.3rem;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  .card h2 {
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+
+  .note {
+    margin-top: 0.4rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+
+  /* signature: price as a tiny punched gift tag */
+  .tag {
+    align-self: flex-start;
+    margin-top: 0.85rem;
+    background: var(--tag-paper);
+    color: #5a5343;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    padding: 0.3rem 0.75rem 0.3rem 1.35rem;
+    border-radius: 4px 999px 999px 4px;
+    position: relative;
+    transform: rotate(-2deg);
+    box-shadow: 0 1px 2px rgba(33,36,42,0.15);
+  }
+  .tag::before {
+    content: "";
+    position: absolute;
+    left: 0.45rem; top: 50%;
+    width: 7px; height: 7px;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background: var(--card);
+    box-shadow: 0 0 0 2px #d9d1bc;
+  }
+
+  .card a {
+    margin-top: auto;
+    padding-top: 1rem;
+    align-self: flex-start;
+    color: var(--accent);
+    font-weight: 800;
+    font-size: 0.95rem;
+    text-decoration: none;
+  }
+  .card a:hover { text-decoration: underline; }
+  .card a:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  footer {
+    max-width: 620px;
+    margin: 3rem auto 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card { transition: none; }
+    .card:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lickity's <em>Wish List</em></h1>
+  <p>
+    A few things I'd genuinely love. No pressure at all —
+    <strong>if you pick one, text Nola before buying so nobody doubles up!</strong>
+  </p>
+</header>
+
+<main class="grid" id="grid">
+  <noscript><p>This list needs JavaScript to load — or open <a href="items.csv">items.csv</a> directly.</p></noscript>
+</main>
+
+<script>
+// Minimal RFC-4180-ish CSV parser: handles quoted fields, "" escapes, CRLF.
+function parseCSV(text) {
+  const rows = [[]];
+  let field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQuotes = false;
+      else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ",") { rows.at(-1).push(field); field = ""; }
+    else if (c === "\n") { rows.at(-1).push(field); field = ""; rows.push([]); }
+    else if (c !== "\r") field += c;
+  }
+  rows.at(-1).push(field);
+  return rows.filter(r => r.some(f => f.trim() !== ""));
+}
+
+// ponytail: one self-check that fails loudly if the parser breaks
+console.assert(
+  JSON.stringify(parseCSV('a,"b, ""q""",c\r\nd,,e')) === '[["a","b, \\"q\\"","c"],["d","","e"]]',
+  "CSV parser self-check failed"
+);
+
+fetch("items.csv")
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+  .then(text => {
+    const [header, ...rows] = parseCSV(text);
+    const grid = document.getElementById("grid");
+    for (const row of rows) {
+      const item = Object.fromEntries(header.map((h, i) => [h.trim(), (row[i] || "").trim()]));
+      if (!item.name) continue;
+      const card = document.createElement("article");
+      card.className = "card";
+      if (item.image) {
+        const img = document.createElement("img");
+        img.src = item.image;
+        img.alt = "";
+        img.onerror = () => img.remove();
+        card.append(img);
+      }
+      const body = document.createElement("div");
+      body.className = "body";
+      const h2 = document.createElement("h2");
+      h2.textContent = item.name;
+      body.append(h2);
+      if (item.note) {
+        const note = document.createElement("p");
+        note.className = "note";
+        note.textContent = item.note;
+        body.append(note);
+      }
+      if (item.price) {
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = item.price;
+        body.append(tag);
+      }
+      if (/^https?:\/\//i.test(item.link)) {
+        const a = document.createElement("a");
+        a.href = item.link;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = "View item →";
+        body.append(a);
+      }
+      card.append(body);
+      grid.append(card);
+    }
+  })
+  .catch(() => {
+    document.getElementById("grid").innerHTML =
+      "<p>Couldn't load items.csv — if you opened this file directly, run it from a web server (it works fine on GitHub Pages).</p>";
+  });
+</script>
+
+<footer>
+  <p>Thanks for thinking of me ♥ — updated whenever I think of something new.</p>
+</footer>
+
+</body>
+</html>
