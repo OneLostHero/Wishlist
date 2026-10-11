@@ -48,9 +48,11 @@ Full URL to the product page. Becomes the "View item →" link; omitted if empty
 - ❌ `example.com/product/123` — no `https://`, so the product link is omitted
 - ❌ `www.amazon.com/dp/XYZ` — same problem; always include the scheme
 
+Amazon links use Ryan's Associates tracking ID, `onelosthero0d-20`. Preserve the `tag=onelosthero0d-20` query parameter when editing these URLs. Tagged Amazon.com links are labelled "Paid link" and retain the same destination on the photo and product link. Keep the affiliate disclosure above the list when publishing affiliate links.
+
 #### `image` (optional)
 
-Full URL to a photo. Shown as a 4:3 cover image at the top of the card; if the URL is broken the image is silently removed and the card renders text-only.
+Full URL to a photo. The full photo fits inside a 4:3 area at the top of the card; if the URL is broken the image is silently removed and the card renders text-only.
 
 - ✅ `https://images.unsplash.com/photo-...?w=800&q=70`
 - ✅ empty — text-only card (like the gift card example)

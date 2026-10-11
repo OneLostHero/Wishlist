@@ -61,6 +61,7 @@ try {
   .eyebrow { color: var(--accent); margin: 0 0 14px; }
   h1 { font-family: Georgia, serif; font-size: clamp(2.7rem, 7vw, 4.7rem); font-weight: 400; letter-spacing: -.055em; line-height: 1.06; margin: 0; overflow-wrap: anywhere; }
   .intro { max-width: 580px; color: var(--muted); font-size: 1.05rem; margin: 22px 0; }
+  .affiliate-disclosure { color: var(--muted); font-size: .85rem; margin: 16px 0; }
   .header-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .header-actions a { font-size: .9rem; padding: .5rem 0; }
   .toolbar { border-top: 1px solid var(--line); padding: 25px 0 18px; display: flex; justify-content: space-between; gap: 20px; align-items: center; flex-wrap: wrap; }
@@ -75,7 +76,7 @@ try {
   .card:target { outline: 3px solid var(--accent); outline-offset: 5px; }
   .image-link { display: block; }
   .image-link:focus-visible { outline-offset: -4px; }
-  .card img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--wash); }
+  .card img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--wash); }
   .card.unavailable img { filter: grayscale(1); opacity: .6; }
   .ribbon { position: absolute; top: 16px; left: 0; z-index: 1; pointer-events: none; background: var(--accent-solid); color: var(--accent-ink); padding: 7px 18px 7px 13px; font-size: .7rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%); }
   .card.no-image .ribbon { position: static; align-self: flex-start; margin-top: 16px; }
@@ -109,6 +110,7 @@ try {
     <p class="eyebrow">Picked with care · Given with love</p>
     <h1 id="title"></h1>
     <p class="intro" id="intro"></p>
+    <p class="affiliate-disclosure">As an Amazon Associate I earn from qualifying purchases.</p>
     <div class="header-actions"><button id="share" type="button">Copy wishlist link ↗</button><a id="contact">Get in touch →</a></div>
   </header>
   <main>
@@ -285,8 +287,15 @@ async function changeClaim(item, release = false) {
     await refreshClaims();
   } finally { pendingClaim = ""; render(); }
 }
+function isAmazonAffiliateLink(link) {
+  try {
+    const url = new URL(link);
+    return /(^|\.)amazon\.com$/i.test(url.hostname) && Boolean(url.searchParams.get("tag"));
+  } catch { return false; }
+}
 function makeCard(item) {
   const hasLink = /^https?:\/\//i.test(item.link);
+  const paidLink = isAmazonAffiliateLink(item.link);
   const card = element("article", "card" + (item.status ? " unavailable" : "") + (!item.image ? " no-image" : ""));
   card.id = item.slug;
   card.setAttribute("aria-labelledby", item.slug + "--heading");
@@ -299,8 +308,8 @@ function makeCard(item) {
     if (hasLink) {
       picture.href = item.link;
       picture.target = "_blank";
-      picture.rel = "noopener";
-      picture.setAttribute("aria-label", `View ${item.name} (opens in a new tab)`);
+      picture.rel = paidLink ? "sponsored noopener" : "noopener";
+      picture.setAttribute("aria-label", `View ${item.name} (${paidLink ? "paid link; " : ""}opens in a new tab)`);
       picture.append(img);
     }
     img.onerror = () => { picture.remove(); card.classList.add("no-image"); };
@@ -316,10 +325,10 @@ function makeCard(item) {
   if (item.status) body.append(element("span", "stamp", item.status === "tentative" ? "Possibly taken" : item.status));
   const actions = element("div", "actions");
   if (hasLink) {
-    const link = element("a", "product", "View item ↗");
+    const link = element("a", "product", paidLink ? "View item ↗ · Paid link" : "View item ↗");
     link.href = item.link;
     link.target = "_blank";
-    link.rel = "noopener";
+    link.rel = paidLink ? "sponsored noopener" : "noopener";
     actions.append(link);
   }
   const canUndo = item.status === "tentative" && Boolean(claimTokens[item.slug]);
