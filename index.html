@@ -18,7 +18,8 @@ const CONFIG = {
   contact: "", // Optional contact link, for example mailto:you@example.com.
   // GitHub Pages shows statuses from items.csv. Local hosting supports visitor marks.
   claimsAPI: new URL(location.href).hostname.endsWith(".github.io") ? "" : "api/claims",
-  shareURL: "" // Your public URL; blank uses the current page URL.
+  shareURL: "", // Your public URL; blank uses the current page URL.
+  bigWishMinimum: 100 // USD; collections follow their preferred item when there is one.
 };
 // Dark is always the default, regardless of the device's color preference.
 try {
@@ -71,7 +72,27 @@ try {
   .sort { display: flex; align-items: center; gap: 10px; font-size: .8rem; color: var(--muted); }
   select { font-size: .85rem; }
   .count { color: var(--muted); margin: 0 0 20px; font-size: .8rem; }
+  .section-nav { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 24px 0 32px; font-size: .85rem; }
+  .sections { display: grid; gap: 48px; }
+  .wish-section { min-width: 0; scroll-margin-top: 24px; }
+  .section-heading { border-top: 1px solid var(--line); padding-top: 20px; margin-bottom: 22px; }
+  .section-heading h2 { font-size: 2rem; }
+  .section-description { color: var(--muted); font-size: .86rem; margin: 8px 0 0; }
+  .section-content { display: grid; gap: 24px; }
+  .collection { min-width: 0; border: 1px solid var(--line); border-radius: 16px; padding: 24px; background: var(--wash); }
+  .collection-heading { font-family: Georgia, serif; font-size: 1.65rem; font-weight: 400; margin: 0; }
+  .collection-intro { color: var(--muted); font-size: .88rem; margin: 8px 0 20px; }
+  .collection .preferred-card { flex-direction: row; }
+  .preferred-card .image-link { width: 43%; flex-shrink: 0; display: flex; }
+  .preferred-card img { height: 100%; max-height: 420px; }
+  .choice { color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; font-size: .72rem; font-weight: 650; padding: 3px 10px; margin: 0 0 12px; }
+  .stock { color: var(--muted); font-size: .8rem; font-weight: 650; margin: 0 0 16px; }
+  .alternatives { margin-top: 22px; }
+  .alternatives > summary { cursor: pointer; color: var(--accent); padding: 10px 0; font-size: .9rem; font-weight: 650; }
+  .alternatives[open] > summary { margin-bottom: 12px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 24px; align-items: stretch; }
+  .section-content > .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); }
+  .section-content > .grid > .card:only-child { max-width: 500px; }
   .card { min-width: 0; position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; scroll-margin-top: 24px; }
   .card:target { outline: 3px solid var(--accent); outline-offset: 5px; }
   .image-link { display: block; }
@@ -82,7 +103,7 @@ try {
   .card.no-image .ribbon { position: static; align-self: flex-start; margin-top: 16px; }
   .body { padding: 22px; display: flex; flex-direction: column; flex: 1; align-items: flex-start; overflow-wrap: anywhere; }
   .category { color: var(--accent); font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 9px; }
-  h2 { font-family: Georgia, serif; font-size: 1.55rem; font-weight: 400; line-height: 1.22; margin: 0; }
+  h2, .card-title { font-family: Georgia, serif; font-size: 1.55rem; font-weight: 400; line-height: 1.22; margin: 0; }
   .note { color: var(--muted); font-size: .88rem; margin: 12px 0 0; white-space: pre-line; }
   .tag { margin: 20px 0 24px; background: var(--tag-paper); color: var(--tag-ink); font-weight: 700; font-size: .82rem; padding: 7px 16px 7px 29px; border-radius: 4px 999px 999px 4px; position: relative; transform: rotate(-3deg); max-width: 100%; }
   .tag::before { content: ""; position: absolute; left: 11px; top: 50%; width: 6px; height: 6px; transform: translateY(-50%); border-radius: 50%; background: var(--card); box-shadow: 0 0 0 2px #93afcf; }
@@ -107,7 +128,8 @@ try {
   footer p { margin: 5px 0; }
   footer .thanks { color: var(--ink); font-family: Georgia, serif; font-style: italic; font-size: 1.15rem; margin-bottom: 12px; }
   [hidden] { display: none !important; }
-  @media (max-width: 520px) { .shell { padding: 0 20px; } header { padding-top: 38px; } .toolbar { gap: 16px; } .sort { width: 100%; justify-content: space-between; } }
+  @media (max-width: 700px) { .collection .preferred-card { flex-direction: column; } .preferred-card .image-link { width: 100%; } .preferred-card img { height: auto; } }
+  @media (max-width: 520px) { .shell { padding: 0 20px; } header { padding-top: 38px; } .toolbar { gap: 16px; } .sort { width: 100%; justify-content: space-between; } .collection { padding: 14px; } }
 </style>
 </head>
 <body>
@@ -123,13 +145,14 @@ try {
   <main>
     <div class="toolbar" id="controls" hidden>
       <div class="chips" id="categories" role="group" aria-label="Filter by category"></div>
-      <label class="sort">Sort by <select id="sort"><option value="priority">Most wanted</option><option value="low">Price low → high</option><option value="high">Price high → low</option></select></label>
+      <label class="sort">View <select id="sort"><option value="sections">Sections &amp; collections</option><option value="priority">Most wanted</option><option value="low">Price low → high</option><option value="high">Price high → low</option></select></label>
     </div>
     <p class="count" id="count" role="status">Loading the wishlist…</p>
     <p class="count" id="claim-help" hidden>Claimed items are updated by Ryan.</p>
     <p class="count" id="price-help" hidden>Prices are shown in USD and refresh about every 6 hours. Converted prices are marked as estimates. Check the store for the final price, shipping and tax.</p>
     <p class="notice" id="notice" role="status"></p>
     <label class="copy-fallback" id="copy-fallback" hidden>Copy this link manually:<input id="copy-value" readonly></label>
+    <nav class="section-nav" id="section-nav" aria-label="Jump to a wishlist section" hidden></nav>
     <div class="grid" id="grid"></div>
     <noscript><p>This list needs JavaScript to load — or open <a href="items.csv">items.csv</a> directly.</p></noscript>
   </main>
@@ -227,9 +250,10 @@ function pricedItem(item, now = Date.now()) {
   if (!["shopify", "amazon"].includes(item.price_source)) return item;
   const entry = priceFeed[item.link];
   const checked = Date.parse(entry?.checked_at), expires = Date.parse(entry?.expires_at);
-  const fresh = entry?.source === item.price_source && entry.status === "ok" &&
+  const current = entry?.source === item.price_source &&
     Number.isFinite(checked) && checked <= now + 300000 &&
-    now < Math.min(expires, checked + 86400000) &&
+    now < Math.min(expires, checked + 86400000);
+  const fresh = current && entry.status === "ok" &&
     typeof entry.amount === "number" && Number.isFinite(entry.amount) && entry.amount > 0 &&
     entry.currency === "USD";
   if (!fresh) return { ...item, price: "", amount: null,
@@ -237,6 +261,7 @@ function pricedItem(item, now = Date.now()) {
   const price = new Intl.NumberFormat("en-US", { style: "currency", currency: entry.currency,
     currencyDisplay: "narrowSymbol" }).format(entry.amount) + " " + entry.currency;
   return { ...item, price: (entry.from ? "From " : "") + (entry.estimate ? "≈ " : "") + price, amount: entry.amount,
+    soldOut: item.price_source === "shopify" && entry.availability === "out_of_stock",
     priceChecked: entry.checked_at, pricePreorder: entry.availability === "preorder",
     priceConversion: entry.estimate ? `USD estimate; store charges ${entry.original_currency}. Exchange rate dated ${entry.fx_date}.` : "" };
 }
@@ -257,6 +282,9 @@ function readItems(text) {
   return rows.map((row, index) => {
     const item = Object.fromEntries(header.map((h, i) => [h.trim(), (row[i] || "").trim()]));
     item.category = item.category || "";
+    item.collection = item.collection || "";
+    item.preferred = item.preferred === "yes";
+    item.budget = ["big", "small"].includes(item.budget) ? item.budget : "";
     item.priority = ["1", "3"].includes(item.priority) ? Number(item.priority) : 2;
     item.status = ["claimed", "bought"].includes(item.status) ? item.status : "";
     item.amount = priceNumber(item.price || "");
@@ -329,7 +357,7 @@ function isAmazonAffiliateLink(link) {
     return /(^|\.)amazon\.com$/i.test(url.hostname) && Boolean(url.searchParams.get("tag"));
   } catch { return false; }
 }
-function makeCard(item) {
+function makeCard(item, heading = "h2") {
   const hasLink = /^https?:\/\//i.test(item.link);
   const paidLink = isAmazonAffiliateLink(item.link);
   const card = element("article", "card" + (item.status ? " unavailable" : "") + (!item.image ? " no-image" : ""));
@@ -353,7 +381,8 @@ function makeCard(item) {
   }
   const body = element("div", "body");
   if (item.category) body.append(element("p", "category", item.category));
-  const title = element("h2", "", item.name);
+  if (item.preferred) body.append(element("span", "choice", "Preferred choice"));
+  const title = element(heading, "card-title", item.name);
   title.id = item.slug + "--heading";
   body.append(title);
   if (item.note) body.append(element("p", "note", item.note));
@@ -374,6 +403,7 @@ function makeCard(item) {
     body.append(price);
   } else if (item.price) body.append(element("span", "tag", item.price));
   else if (item.priceFallback) body.append(element("p", "price-unavailable", item.priceFallback));
+  if (item.soldOut) body.append(element("p", "stock", "Out of stock · Waiting for a restock"));
   if (item.status) body.append(element("span", "stamp", item.status === "tentative" ? "Possibly taken" : item.status));
   const actions = element("div", "actions");
   if (hasLink) {
@@ -401,11 +431,114 @@ function makeCard(item) {
   card.append(body);
   return card;
 }
+const openCollections = new Set();
+let alternativesForItem = new Map();
+function budgetFor(item) {
+  // Automatic prices are validated USD. Explicit foreign manual prices keep their text,
+  // but must not be treated as dollars when assigning a budget section.
+  const manual = item.price || "";
+  const usd = item.priceChecked || /\bUSD\b/i.test(manual) ||
+    (/^(?:~|≈|from\s+|under\s+|about\s+)?\$[\d,.]/i.test(manual) && !/\b[a-z]{3}\b/i.test(manual));
+  if (item.amount !== null && usd) return item.amount >= CONFIG.bigWishMinimum ? "big" : "small";
+  return item.budget || "unknown";
+}
+function makeCollection(members, allItems, claimed) {
+  const name = members[0].collection;
+  const section = element("section", "collection");
+  section.setAttribute("aria-label", name);
+  section.append(element("h3", "collection-heading", name));
+  const preferred = allItems.filter(item => item.collection === name && item.preferred);
+  const choices = members.filter(item => item.preferred);
+  const others = members.filter(item => !item.preferred);
+  const hasAlternatives = preferred.length > 0 && !claimed;
+  const intro = claimed ? "Already marked for this collection." : !preferred.length ? "Related wishes, collected together." :
+    preferred.every(item => item.status) ? "The preferred choice is already marked. Please check before choosing an alternative." :
+    "The preferred choice comes first. The individual items are alternatives, not extra gifts.";
+  section.append(element("p", "collection-intro", intro));
+  for (const item of choices) {
+    const card = makeCard(item, "h4");
+    card.classList.add("preferred-card");
+    section.append(card);
+  }
+  if (others.length) {
+    const grid = element("div", "grid");
+    grid.append(...others.map(item => makeCard(item, "h4")));
+    if (hasAlternatives) {
+      const details = element("details", "alternatives");
+      details.open = openCollections.has(name);
+      details.append(element("summary", "", `See alternatives (${others.length})`), grid);
+      details.ontoggle = () => details.open ? openCollections.add(name) : openCollections.delete(name);
+      for (const item of others) alternativesForItem.set(item.slug, details);
+      section.append(details);
+    } else section.append(grid);
+  }
+  return section;
+}
+function renderSections(visible, allItems) {
+  const buckets = new Map(["big", "small", "unknown", "claimed"].map(key => [key, { singles: [], collections: new Map() }]));
+  for (const claimed of [false, true]) {
+    const members = visible.filter(item => Boolean(item.status) === claimed);
+    const collections = new Map();
+    for (const item of members) {
+      if (!item.collection) buckets.get(claimed ? "claimed" : budgetFor(item)).singles.push(item);
+      else {
+        if (!collections.has(item.collection)) collections.set(item.collection, []);
+        collections.get(item.collection).push(item);
+      }
+    }
+    for (const [name, group] of collections) {
+      // Use the preferred item's budget for the entire collection so alternatives stay together.
+      const choices = allItems.filter(item => item.collection === name && item.preferred);
+      const budgets = (choices.length ? choices : group).map(budgetFor);
+      const budget = claimed ? "claimed" : budgets.includes("big") ? "big" : budgets.every(b => b === "small") ? "small" : "unknown";
+      buckets.get(budget).collections.set(name, group);
+    }
+  }
+  const minimum = new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", maximumFractionDigits:0}).format(CONFIG.bigWishMinimum);
+  const labels = {
+    big: ["Big wishes", `Usually ${minimum} USD and up. Collections follow the preferred choice; individual alternatives may cost less.`],
+    small: ["Little wishes", `Under ${minimum} USD per item.`],
+    unknown: ["More wishes", "Prices vary or need checking at the store."],
+    claimed: ["Claimed & possibly taken", "These wishes already have a mark. Thank you for thinking of me."]
+  };
+  const sections = [], links = [];
+  for (const [key, {singles, collections}] of buckets) {
+    if (!singles.length && !collections.size) continue;
+    const section = element("section", "wish-section");
+    section.id = `section-${key}`;
+    section.setAttribute("aria-labelledby", `${section.id}-heading`);
+    const header = element("div", "section-heading");
+    const heading = element("h2", "", labels[key][0]);
+    heading.id = `${section.id}-heading`;
+    header.append(heading, element("p", "section-description", labels[key][1]));
+    const content = element("div", "section-content");
+    if (singles.length) {
+      const grid = element("div", "grid");
+      grid.append(...singles.map(item => makeCard(item, "h3")));
+      content.append(grid);
+    }
+    for (const group of collections.values()) content.append(makeCollection(group, allItems, key === "claimed"));
+    section.append(header, content);
+    sections.push(section);
+    const link = element("a", "", labels[key][0]);
+    link.href = `#${section.id}`;
+    links.push(link);
+  }
+  $("section-nav").replaceChildren(...links);
+  $("section-nav").hidden = links.length < 2;
+  $("grid").replaceChildren(...sections);
+}
 let items = [], category = null;
 function render() {
-  const visible = items.map(item => ({ ...pricedItem(item), status: item.status || (claims.includes(item.slug) ? "tentative" : "") }))
-    .filter(item => category === null || item.category === category).sort((a, b) => compareItems(a, b, $("sort").value));
-  $("grid").replaceChildren(...visible.map(makeCard));
+  const sectioned = $("sort").value === "sections";
+  const allItems = items.map(item => ({ ...pricedItem(item), status: item.status || (claims.includes(item.slug) ? "tentative" : "") }));
+  const visible = allItems.filter(item => category === null || item.category === category)
+    .sort((a, b) => compareItems(a, b, sectioned ? "priority" : $("sort").value));
+  alternativesForItem = new Map();
+  $("grid").className = sectioned ? "sections" : "grid";
+  $("section-nav").hidden = true;
+  if (sectioned) renderSections(visible, allItems);
+  else $("grid").replaceChildren(...visible.map(item => makeCard(item)));
   $("count").textContent = `${visible.length} ${visible.length === 1 ? "wish" : "wishes"}${category !== null ? ` in ${category}` : " on the list"} · A little inspiration, never an obligation.`;
   if (!items.length) $("count").textContent = "No wishes just yet. Check back soon.";
 }
@@ -419,6 +552,12 @@ function revealAnchor() {
   try { id = decodeURIComponent(location.hash.slice(1)); } catch { return; }
   if (!items.some(item => item.slug === id)) return;
   if (!$(id)) setCategory(null);
+  const details = alternativesForItem.get(id);
+  if (details) {
+    details.open = true;
+    const item = items.find(item => item.slug === id);
+    openCollections.add(item.collection);
+  }
   $(id).scrollIntoView({ block: "start" });
 }
 $("sort").onchange = render;
@@ -427,6 +566,8 @@ fetch("items.csv", { cache: "no-cache" })
   .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
   .then(text => {
     items = readItems(text);
+    // Keep original ordering for old five-column lists without section metadata.
+    if (!items.some(item => item.category || item.collection || item.budget || item.price_source) && $("sort").value === "sections") $("sort").value = "priority";
     for (const value of [null, ...new Set(items.map(item => item.category).filter(Boolean))]) {
       const chip = element("button", "chip", value === null ? "All wishes" : value);
       chip.type = "button";

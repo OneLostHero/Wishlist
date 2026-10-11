@@ -49,9 +49,25 @@ class PricesTest(unittest.TestCase):
         self.assertEqual(price["amount"], 25)
         self.assertTrue(price["from"])
         self.assertEqual(client.calls[0][0], "https://shop.test/en-us/cart.js?currency=USD")
-        for suffix, reason in (("?variant=1", "unavailable"), ("?variant=9", "variant_not_found")):
-            with self.assertRaisesRegex(FetchError, reason):
-                shopify_price(SHOP + suffix, FakeClient([{"currency": "USD"}, product]))
+        sold_out = shopify_price(SHOP + "?variant=1", FakeClient([{"currency": "USD"}, product]))
+        self.assertEqual(sold_out["amount"], 1)
+        self.assertEqual(sold_out["availability"], "out_of_stock")
+        with self.assertRaisesRegex(FetchError, "variant_not_found"):
+            shopify_price(SHOP + "?variant=9", FakeClient([{"currency": "USD"}, product]))
+
+    def test_sold_out_price_and_status_expire_together_and_restock_clears_status(self):
+        row = {"name": "Box set", "link": SHOP, "price_source": "shopify"}
+        for available, status in ((False, "out_of_stock"), (True, "available")):
+            feed = build_feed([row], FakeClient([{"currency": "USD"}, {"variants": [variant(1, 40000, available)]}]),
+                              env={}, clock=lambda: NOW)
+            entry = feed["items"][SHOP]
+            self.assertEqual(entry["status"], "ok")
+            self.assertEqual(entry["amount"], 400)
+            self.assertEqual(entry["availability"], status)
+            self.assertEqual(entry["expires_at"], "2026-10-12T11:00:00Z")
+        for variants in ([], [variant(1, 40000, None)]):
+            with self.assertRaisesRegex(FetchError, "unavailable"):
+                shopify_price(SHOP, FakeClient([{"currency": "USD"}, {"variants": variants}]))
 
     def test_usd_offer_needs_no_conversion_and_foreign_offer_is_labelled(self):
         price = {"amount": 857, "currency": "CAD", "from": False}

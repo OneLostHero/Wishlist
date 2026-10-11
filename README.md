@@ -12,7 +12,7 @@ Edit `items.csv`, then refresh the local page. To update the public site, commit
 
 ### CSV columns
 
-The header row must be line 1: `name,price,note,link,image,category,priority,status,price_source`. Columns after `image` are optional: existing five-column files still work, preserving their content and original order under the default sort. Columns are matched by header name, so order technically doesn't matter — but keep the standard order for sanity.
+The header row must be line 1: `name,price,note,link,image,category,priority,status,price_source,collection,preferred,budget`. Columns after `image` are optional: existing five-column files still work, preserving their content and original order under the default sort. Columns are matched by header name, so order technically doesn't matter — but keep the standard order for sanity.
 
 #### `name` (required)
 
@@ -86,6 +86,18 @@ Controls the “Most wanted” sort. Ties keep their CSV order.
 - ✅ `3` — nice to have
 - ❌ other values — treated as `2`
 
+#### `collection`, `preferred` and `budget` (optional)
+
+The default **Sections & collections** view separates **Big wishes** (usually $100+ USD), **Little wishes** (under $100 USD), and **More wishes** (variable or unverified prices). Empty sections disappear. Category filters apply within this view. Choose **Most wanted** or either price sort to browse all matching cards in one grid instead.
+
+- `collection` — a shared name groups related items in one panel. For example, all EPIC records use `EPIC: The Musical`. Leave blank for standalone gifts.
+- `preferred` — `yes` puts that item first in its collection, labels it **Preferred choice**, and puts the other members under **See alternatives**. The nine-LP mega box set is Ryan's preferred EPIC gift; the individual LPs are alternatives. This is independent of the `priority=1` ribbon.
+- `budget` — `big` or `small` supplies a usual budget when a live price is missing (including sold-out items). A current USD price takes precedence. This field never invents or displays an exact price. Leave blank when the usual budget is unknown.
+
+A collection follows its preferred item's budget; without a preferred item, any big item puts the collection in Big wishes. Items already marked claimed, bought or possibly taken always move to a separate section at the bottom, retaining their collection labels. Copy links open a collapsed alternative automatically. Opening alternatives is remembered while the page stays open, including across price refreshes.
+
+Shopify products confirmed sold out retain their listed USD price and show **Out of stock · Waiting for a restock**. This uses the dated price feed and disappears after its validity period or when the item becomes available; failed requests do not claim an item is sold out. Sold-out items stay on the wishlist and are distinct from claimed gifts. An available variant takes precedence over sold-out variants unless the link selects an exact variant.
+
 #### `status` (optional)
 
 Use a blank field, `claimed`, or `bought`. Claimed and bought items always follow available items in **every** sort, with a stamp and a greyscale photo. They have no "I might get this" button.
@@ -123,6 +135,7 @@ Edit the `CONFIG` object at the top of `index.html`:
 - `contact` — optional `sms:+15551234567` or `mailto:you@example.com` for the header contact link. Blank by default. Gift buttons save a tentative mark and do not use this setting.
 - `claimsAPI` — endpoint for visitor marking; automatically disabled on `*.github.io`, where statuses come from the CSV. Set it to an empty string for any other static host, or a hosted API URL when one is available. The local server uses `api/claims`.
 - `shareURL` — your full public URL, including any path and trailing slash. Leave blank to share the current page URL.
+- `bigWishMinimum` — the USD threshold for Big wishes; defaults to `100`.
 
 The header has a wishlist copy button; each card has its own copy button with a `#item-name` anchor. Names generate the anchors, with suffixes for duplicates. Renaming an item changes its anchor. Copying uses `navigator.clipboard` on HTTPS or localhost, with a selectable-link fallback if clipboard access is unavailable.
 
@@ -177,7 +190,7 @@ node tests/verify.cjs
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-The Node checks cover current and legacy CSV rendering, filters, sorts, themes, tentative marks/undo, copy-link fallback, current/stale/failed price feeds, USD-only automatic prices, labelled conversions and price expiry in long-open tabs. Python checks cover Shopify currencies/variants, USD preference, exchange-rate dates and failures, Amazon offer restrictions and credential isolation, partial source failures, and the claims server's persistence, undo authorization and private-file isolation. Tests mock retailer responses; run `python refresh_prices.py` to check real source access. Node is only needed for checks, not to run the app.
+The Node checks cover current and legacy CSV rendering, sections and budget boundaries, collections and preferred alternatives, filters, sorts, themes, tentative marks/undo, copy-link fallback, collapsed deep links, current/stale/failed price feeds, USD-only automatic prices, labelled conversions and price expiry in long-open tabs. Python checks cover Shopify currencies/variants, sold-out prices and restocks, USD preference, exchange-rate dates and failures, Amazon offer restrictions and credential isolation, partial source failures, and the claims server's persistence, undo authorization and private-file isolation. Tests mock retailer responses; run `python refresh_prices.py` to check real source access. Node is only needed for checks, not to run the app.
 
 ## Credits & license
 

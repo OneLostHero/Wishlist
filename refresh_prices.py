@@ -87,14 +87,20 @@ def shopify_price(link, client):
         variants = [v for v in variants if str(v["id"]) == variant_id]
         if not variants:
             raise FetchError("variant_not_found")
-    variants = [v for v in variants if v.get("available") is True]
-    if not variants:
+    available = [v for v in variants if v.get("available") is True]
+    if available:
+        variants = available
+        availability = "available"
+    elif variants and all(v.get("available") is False for v in variants):
+        # Keep a sold-out wish's listed price, clearly paired with its stock status.
+        availability = "out_of_stock"
+    else:
         raise FetchError("unavailable")
     amounts = [v["price"] for v in variants]
     if not all(valid_money(amount, currency) for amount in amounts):
         raise FetchError("invalid_price")
     return {"amount": min(amounts) / 100, "currency": currency,
-            "from": min(amounts) != max(amounts), "availability": "available"}
+            "from": min(amounts) != max(amounts), "availability": availability}
 
 
 def usd_price(price, client, rates, now):
