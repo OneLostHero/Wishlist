@@ -37,7 +37,7 @@ async function page(csv, opts = {}) {
   const actualItems = actual.run('readItems(' + JSON.stringify(csv) + ')');
   const legacyItems = legacy.run('readItems(' + JSON.stringify(legacyCSV) + ')');
   for (const key of ['name','price','note','link','image']) assert.equal(actualItems[0][key], legacyItems[0][key]);
-  assert.equal(actual.nodes.grid.children.length,1);
+  assert.equal(actual.nodes.grid.children.length,actualItems.length);
   assert.equal(legacy.nodes.grid.children.length,1);
   assert.equal(legacyItems[0].priority,2);
   assert.equal(legacyItems[0].status,'');

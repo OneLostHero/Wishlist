@@ -1,3 +1,4 @@
+import csv
 import json
 import shutil
 import tempfile
@@ -67,8 +68,14 @@ class ClaimsTest(unittest.TestCase):
         self.assertEqual(self.request(action="claim", origin="https://unrelated.test")[0], 403)
         self.assertEqual(self.request(action="claim", token="short")[0], 400)
         self.assertEqual(self.request("/")[0], 200)
-        text = (self.root / "items.csv").read_text(encoding="utf-8")
-        (self.root / "items.csv").write_text(text.rstrip() + "bought\n", encoding="utf-8")
+        with (self.root / "items.csv").open(encoding="utf-8", newline="") as source:
+            reader = csv.DictReader(source)
+            fields, items = reader.fieldnames, list(reader)
+        next(item for item in items if item["name"] == "Majora's Mask wooden replica")["status"] = "bought"
+        with (self.root / "items.csv").open("w", encoding="utf-8", newline="") as target:
+            writer = csv.DictWriter(target, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(items)
         self.assertEqual(self.request(action="claim")[0], 409)
 
 

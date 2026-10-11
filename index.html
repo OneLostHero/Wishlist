@@ -28,17 +28,17 @@ try {
 <style>
   :root {
     color-scheme: dark;
-    --ground: #17151b; --card: #242027; --ink: #f7eff0; --muted: #c1b4bd;
-    --accent: #ff9ab6; --accent-solid: #932749; --accent-ink: #fff4f7;
-    --line: #493842; --wash: #33232d; --tag-paper: #f2dfbb; --tag-ink: #463528;
+    --ground: #0f1724; --card: #182638; --ink: #edf4ff; --muted: #aabdd3;
+    --accent: #85baff; --accent-solid: #285d9e; --accent-ink: #f3f8ff;
+    --line: #31465f; --wash: #1d3550; --tag-paper: #d4e6ff; --tag-ink: #253f5e;
     --shadow: 0 12px 36px #00000026;
   }
   :root[data-theme="light"] {
     color-scheme: light;
-    --ground: #faf5ef; --card: #fffdfa; --ink: #30232b; --muted: #73616b;
-    --accent: #9e3155; --accent-solid: #932749; --accent-ink: #fff4f7;
-    --line: #dfcdd2; --wash: #f5e6eb; --tag-paper: #f2dfbb; --tag-ink: #463528;
-    --shadow: 0 12px 36px #542d3510;
+    --ground: #f2f6fc; --card: #fbfdff; --ink: #192c42; --muted: #546981;
+    --accent: #23588f; --accent-solid: #285d9e; --accent-ink: #f3f8ff;
+    --line: #c6d6e8; --wash: #e2edfb; --tag-paper: #d4e6ff; --tag-ink: #253f5e;
+    --shadow: 0 12px 36px #253f5e10;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--ground); color: var(--ink); font-family: system-ui, sans-serif; line-height: 1.5; }
@@ -80,7 +80,7 @@ try {
   h2 { font-family: Georgia, serif; font-size: 1.55rem; font-weight: 400; line-height: 1.22; margin: 0; }
   .note { color: var(--muted); font-size: .88rem; margin: 12px 0 0; white-space: pre-line; }
   .tag { margin: 20px 0 24px; background: var(--tag-paper); color: var(--tag-ink); font-weight: 700; font-size: .82rem; padding: 7px 16px 7px 29px; border-radius: 4px 999px 999px 4px; position: relative; transform: rotate(-3deg); max-width: 100%; }
-  .tag::before { content: ""; position: absolute; left: 11px; top: 50%; width: 6px; height: 6px; transform: translateY(-50%); border-radius: 50%; background: var(--card); box-shadow: 0 0 0 2px #c3ac89; }
+  .tag::before { content: ""; position: absolute; left: 11px; top: 50%; width: 6px; height: 6px; transform: translateY(-50%); border-radius: 50%; background: var(--card); box-shadow: 0 0 0 2px #93afcf; }
   .stamp { display: inline-block; border: 2px solid var(--muted); color: var(--muted); border-radius: 4px; padding: 3px 10px; text-transform: uppercase; font-size: .75rem; font-weight: 750; letter-spacing: .1em; transform: rotate(-5deg); margin: 0 0 18px; }
   .actions { margin-top: auto; width: 100%; padding-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-top: 1px solid var(--line); }
   .actions .product { width: 100%; padding-bottom: 5px; font-size: .86rem; text-decoration: none; }
