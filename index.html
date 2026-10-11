@@ -86,6 +86,13 @@ try {
   .note { color: var(--muted); font-size: .88rem; margin: 12px 0 0; white-space: pre-line; }
   .tag { margin: 20px 0 24px; background: var(--tag-paper); color: var(--tag-ink); font-weight: 700; font-size: .82rem; padding: 7px 16px 7px 29px; border-radius: 4px 999px 999px 4px; position: relative; transform: rotate(-3deg); max-width: 100%; }
   .tag::before { content: ""; position: absolute; left: 11px; top: 50%; width: 6px; height: 6px; transform: translateY(-50%); border-radius: 50%; background: var(--card); box-shadow: 0 0 0 2px #93afcf; }
+  .price-block { margin: 18px 0 22px; }
+  .price-block .tag { display: inline-block; margin: 0 0 10px; }
+  .price-note, .price-details { color: var(--muted); font-size: .72rem; margin: 0; }
+  .price-unavailable { color: var(--muted); font-size: .85rem; margin: 18px 0 22px; }
+  .price-details { margin-top: 6px; }
+  .price-details summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .price-details p { margin: 8px 0; }
   .stamp { display: inline-block; border: 2px solid var(--muted); color: var(--muted); border-radius: 4px; padding: 3px 10px; text-transform: uppercase; font-size: .75rem; font-weight: 750; letter-spacing: .1em; transform: rotate(-5deg); margin: 0 0 18px; }
   .actions { margin-top: auto; width: 100%; padding-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-top: 1px solid var(--line); }
   .actions .product { width: 100%; padding-bottom: 5px; font-size: .86rem; text-decoration: none; }
@@ -120,6 +127,7 @@ try {
     </div>
     <p class="count" id="count" role="status">Loading the wishlist…</p>
     <p class="count" id="claim-help" hidden>Claimed items are updated by Ryan.</p>
+    <p class="count" id="price-help" hidden>Prices refresh about every 6 hours. Currencies are shown as listed; price sorting does not convert them. Check the store for the final price, shipping and tax.</p>
     <p class="notice" id="notice" role="status"></p>
     <label class="copy-fallback" id="copy-fallback" hidden>Copy this link manually:<input id="copy-value" readonly></label>
     <div class="grid" id="grid"></div>
@@ -213,6 +221,33 @@ function priceNumber(price) {
   // First number, including comma-grouped thousands and decimal prices.
   const match = price.match(/\d[\d,]*(?:\.\d+)?|\.\d+/);
   return match ? Number(match[0].replace(/,/g, "")) : null;
+}
+let priceFeed = {};
+function pricedItem(item, now = Date.now()) {
+  if (!["shopify", "amazon"].includes(item.price_source)) return item;
+  const entry = priceFeed[item.link];
+  const checked = Date.parse(entry?.checked_at), expires = Date.parse(entry?.expires_at);
+  const fresh = entry?.source === item.price_source && entry.status === "ok" &&
+    Number.isFinite(checked) && checked <= now + 300000 &&
+    now < Math.min(expires, checked + 86400000) &&
+    typeof entry.amount === "number" && Number.isFinite(entry.amount) && entry.amount > 0 &&
+    typeof entry.currency === "string" && /^[A-Z]{3}$/.test(entry.currency);
+  if (!fresh) return { ...item, price: "", amount: null,
+    priceFallback: item.price_source === "amazon" ? "Check price on Amazon" : "Check price at the store" };
+  const price = new Intl.NumberFormat("en-US", { style: "currency", currency: entry.currency,
+    currencyDisplay: "narrowSymbol" }).format(entry.amount) + " " + entry.currency;
+  return { ...item, price: (entry.from ? "From " : "") + price, amount: entry.amount,
+    priceChecked: entry.checked_at, pricePreorder: entry.availability === "preorder" };
+}
+async function refreshPrices() {
+  try {
+    const response = await fetch("prices.json", { cache: "no-store" });
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    if (data.version !== 1 || !data.items || typeof data.items !== "object" || Array.isArray(data.items)) throw new Error();
+    priceFeed = data.items;
+  } catch { /* Keep any still-fresh result in memory; expired prices are hidden by pricedItem. */ }
+  render();
 }
 function readItems(text) {
   const [header = [], ...rows] = parseCSV(text);
@@ -321,7 +356,22 @@ function makeCard(item) {
   title.id = item.slug + "--heading";
   body.append(title);
   if (item.note) body.append(element("p", "note", item.note));
-  if (item.price) body.append(element("span", "tag", item.price));
+  if (item.priceChecked) {
+    const price = element("div", "price-block");
+    price.append(element("span", "tag", item.price));
+    const checked = element("time", "price-note", `${item.pricePreorder ? "Pre-order · " : ""}Checked ${new Date(item.priceChecked).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`);
+    checked.setAttribute("datetime", item.priceChecked);
+    price.append(element("br", ""), checked);
+    if (item.price_source === "amazon") {
+      const details = element("details", "price-details");
+      details.append(element("summary", "", "Price details"));
+      details.append(element("p", "", "Product prices and availability are accurate as of the date/time indicated and are subject to change. Any price and availability information displayed on Amazon.com at the time of purchase will apply to the purchase of this product."));
+      details.append(element("p", "", "CERTAIN CONTENT THAT APPEARS ON THIS SITE COMES FROM AMAZON. THIS CONTENT IS PROVIDED ‘AS IS’ AND IS SUBJECT TO CHANGE OR REMOVAL AT ANY TIME."));
+      price.append(details);
+    }
+    body.append(price);
+  } else if (item.price) body.append(element("span", "tag", item.price));
+  else if (item.priceFallback) body.append(element("p", "price-unavailable", item.priceFallback));
   if (item.status) body.append(element("span", "stamp", item.status === "tentative" ? "Possibly taken" : item.status));
   const actions = element("div", "actions");
   if (hasLink) {
@@ -351,7 +401,7 @@ function makeCard(item) {
 }
 let items = [], category = null;
 function render() {
-  const visible = items.map(item => ({ ...item, status: item.status || (claims.includes(item.slug) ? "tentative" : "") }))
+  const visible = items.map(item => ({ ...pricedItem(item), status: item.status || (claims.includes(item.slug) ? "tentative" : "") }))
     .filter(item => category === null || item.category === category).sort((a, b) => compareItems(a, b, $("sort").value));
   $("grid").replaceChildren(...visible.map(makeCard));
   $("count").textContent = `${visible.length} ${visible.length === 1 ? "wish" : "wishes"}${category !== null ? ` in ${category}` : " on the list"} · A little inspiration, never an obligation.`;
@@ -385,8 +435,23 @@ fetch("items.csv", { cache: "no-cache" })
     }
     $("controls").hidden = false;
     $("claim-help").hidden = Boolean(CONFIG.claimsAPI);
+    const autoPrices = items.some(item => ["shopify", "amazon"].includes(item.price_source));
+    $("price-help").hidden = !autoPrices;
     render();
-    refreshClaims().then(revealAnchor);
+    Promise.all([refreshClaims(), autoPrices ? refreshPrices() : Promise.resolve()]).then(revealAnchor);
+    if (autoPrices) {
+      setInterval(() => { if (!document.hidden) refreshPrices(); }, 900000);
+      // Expire prices even when a long-open page is offline or the schedule is delayed.
+      setInterval(() => {
+        for (const [link, entry] of Object.entries(priceFeed)) {
+          if (entry?.status === "ok" && Date.now() >= Math.min(Date.parse(entry.expires_at), Date.parse(entry.checked_at) + 86400000)) {
+            delete priceFeed[link]; render();
+          }
+        }
+      }, 30000);
+      window.addEventListener("focus", () => { render(); refreshPrices(); });
+      window.addEventListener("pageshow", render);
+    }
     if (CONFIG.claimsAPI) {
       setInterval(() => { if (!document.hidden && !pendingClaim) refreshClaims(); }, 15000);
       window.addEventListener("focus", refreshClaims);

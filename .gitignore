@@ -6,3 +6,5 @@ _tmp/
 .wishlist/
 __pycache__/
 _site/
+prices.json
+prices.tmp

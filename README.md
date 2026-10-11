@@ -1,6 +1,6 @@
 # Ryan's wishlist
 
-Ryan's wishlist: a personal gift list with a dark, grown-up gift-tag design. Item content lives in `items.csv`; shared "Possibly taken" marks are saved by `server.py` in a local SQLite database. No build step or third-party dependencies. Requires Python 3.10 or later to run the server.
+Ryan's wishlist: a personal gift list with a dark, grown-up gift-tag design. Item content lives in `items.csv`; shared "Possibly taken" marks are saved by `server.py` in a local SQLite database. The public site refreshes retailer prices during its scheduled deployment. No third-party dependencies. Requires Python 3.10 or later for the server and price updater.
 
 Public wishlist: **https://onelosthero.github.io/Wishlist/**. The GitHub Pages version displays the list and owner-managed claimed statuses. Visitor marking is available when running the local Python server.
 
@@ -12,7 +12,7 @@ Edit `items.csv`, then refresh the local page. To update the public site, commit
 
 ### CSV columns
 
-The header row must be line 1: `name,price,note,link,image,category,priority,status`. The last three columns are optional: existing five-column files still work, preserving their content and original order under the default sort. Columns are matched by header name, so order technically doesn't matter — but keep the standard order for sanity.
+The header row must be line 1: `name,price,note,link,image,category,priority,status,price_source`. Columns after `image` are optional: existing five-column files still work, preserving their content and original order under the default sort. Columns are matched by header name, so order technically doesn't matter — but keep the standard order for sanity.
 
 #### `name` (required)
 
@@ -25,11 +25,19 @@ The card title. Plain text, any characters. If it contains a comma, quote it.
 
 #### `price` (optional)
 
-Free text, shown on the little gift tag. The display stays exactly as written. Price sorting uses the **first number** (including decimals and comma-grouped thousands); prices with no number go last within their availability group. Currencies are not converted.
+For manual prices (blank `price_source`), free text shown on the little gift tag exactly as written. Price sorting uses the **first number** (including decimals and comma-grouped thousands); prices with no number go last within their availability group. Currencies are not converted. An automatic source overrides this field and never falls back to an undated manual price.
 
 - ✅ `~$120` · `$30–50` · `under $25` · `any amount`
 - ✅ empty — the tag is simply omitted
 - ❌ `$1,200` unquoted — the comma splits the field; write `"$1,200"`
+
+#### `price_source` (optional)
+
+- `shopify` — fetch the linked Shopify product using its public Ajax product API and use the same session's cart currency. Include `?variant=...` in the link to choose an exact variant. Without a variant, the lowest available price is shown with “From” when available variants have different prices.
+- `amazon` — fetch an Amazon.com `/dp/ASIN` or `/gp/product/ASIN` link through Amazon Creators API. The URL must include the Associates `tag`. Requires eligible API access and the two repository secrets described below. Only public, new-condition offers are displayed; restricted, membership, subscription and temporary deal prices are omitted.
+- Blank — keep the original manual `price` behavior, including text such as `Varies by volume / edition`. Use this for a whole series, gift cards, or retailers without an integration.
+
+Automatic prices include the currency and time checked. If the source fails, is unavailable, or is too old, the card asks the visitor to check the store. No zero, guessed price, or stale manual price replaces a failed lookup. Future integrations belong in `refresh_prices.py`; a retailer URL alone does not guarantee that it exposes an accessible price feed.
 
 #### `note` (optional)
 
@@ -120,9 +128,26 @@ Dark is the default even on a device set to light mode. Visitors can explicitly 
 
 ## Hosting
 
-The public repository is [OneLostHero/Wishlist](https://github.com/OneLostHero/Wishlist), with GitHub Pages deploying via `.github/workflows/pages.yml`. The workflow publishes only `index.html`, `items.csv` and `LICENSE`. Local databases, logs, server code and tests are not part of the website artifact.
+The public repository is [OneLostHero/Wishlist](https://github.com/OneLostHero/Wishlist), with GitHub Pages deploying via `.github/workflows/pages.yml`. The workflow publishes only `index.html`, `items.csv`, generated `prices.json` and `LICENSE`. Local databases, credentials, logs, server code and tests are not part of the website artifact.
 
 GitHub Pages displays the list, category filters, sorting, themes, copy links and CSV `claimed`/`bought` stamps. Visitor marking buttons are hidden because Pages cannot run the claims API. Run `server.py` locally for shared tentative marks; those marks are not synchronized with the public CSV. Product photos load from their existing external URLs.
+
+### Automatic price updates
+
+The Publish wishlist workflow runs on pushes, manual dispatch, and at **00:23, 06:23, 12:23 and 18:23 UTC** daily. Each build fetches prices, then deploys the feed and page together. Prices are generated into an ignored file, never committed to Git history. GitHub's schedule can be delayed, and public-repository schedules can be disabled after 60 days without repository activity; check the Actions tab if updates stop and re-enable the workflow when needed.
+
+The browser fetches the feed with caching disabled, refreshes it every 15 minutes while visible and when the tab regains focus, and hides expired values in long-open tabs. Each price expires after **23 hours**, leaving a margin below Amazon's 24-hour content caching limit. Source failures affect only that item and do not prevent the wishlist from publishing. A page with no feed still renders all items. The generated feed deliberately contains only public prices, timestamps, currency and a short status code.
+
+As of October 11, 2026, the mask and civilization book have working Shopify feeds. Amazon's account page reports that this new Associates account is **not yet approved for Creators API**; its documentation also requires 10 qualifying sales in the past 30 days for product-data access. The Amazon integration is implemented and tested with sample responses, but cannot be tested live or activated until Amazon grants access. Amazon item links remain usable and preserve `tag=onelosthero0d-20`.
+
+When eligible, generate North America **3.1** Creators API credentials and add these **GitHub Actions repository secrets**:
+
+- `AMAZON_CREATORS_CLIENT_ID`
+- `AMAZON_CREATORS_CLIENT_SECRET`
+
+Then run **Actions → Publish wishlist → Run workflow**. The workflow already passes the secrets to the price updater, so no code change is needed. Never put credentials in the CSV, HTML, generated feed, repository variables or commits. This integration currently supports Amazon.com and USD. Amazon prices include a checked timestamp and the required price/content notices under “Price details.”
+
+API references: [Shopify Ajax products](https://shopify.dev/docs/api/ajax/reference/product), [Amazon Creators API setup and eligibility](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/introduction), [Amazon HTTP requests](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/get-started/using-curl), [OffersV2](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/api-reference/resources/offersV2), and [Amazon content policies](https://affiliate-program.amazon.com/help/operating/policies).
 
 ## Notes for AI assistants
 
@@ -136,20 +161,21 @@ GitHub Pages displays the list, category filters, sorting, themes, copy links an
 `fetch()` doesn't work from `file://`, so open the page through a local server:
 
 ```sh
+python refresh_prices.py
 python server.py
 # then visit http://localhost:8000
 ```
 
-The server binds to this computer only by default and stays running until stopped. To restart it, run the command above from this folder. For deliberate LAN access, use `python server.py --host 0.0.0.0` and open this computer's LAN address; configure HTTPS for use beyond local development. A localhost copy link only works on this computer.
+The updater fetches once for a local preview; the six-hour schedule runs on GitHub. The server binds to this computer only by default and stays running until stopped. To restart it, run the command above from this folder. For deliberate LAN access, use `python server.py --host 0.0.0.0` and open this computer's LAN address; configure HTTPS for use beyond local development. A localhost copy link only works on this computer.
 
 ## Verification
 
 ```sh
 node tests/verify.cjs
-python -m unittest discover -s tests -p test_server.py
+python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-The Node checks cover current and legacy CSV rendering, filters, sorts, themes, tentative marks/undo and copy-link fallback. The Python checks exercise the HTTP API, conflicting visitors, restart persistence, undo authorization and private-file isolation. Node is only needed for these checks, not to run the app.
+The Node checks cover current and legacy CSV rendering, filters, sorts, themes, tentative marks/undo, copy-link fallback, current/stale/failed price feeds and price expiry in long-open tabs. Python checks cover Shopify currencies/variants, Amazon offer restrictions and credential isolation, partial source failures, and the claims server's persistence, undo authorization and private-file isolation. Tests mock retailer responses; run `python refresh_prices.py` to check real source access. Node is only needed for checks, not to run the app.
 
 ## Credits & license
 

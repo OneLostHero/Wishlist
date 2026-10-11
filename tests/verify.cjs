@@ -22,12 +22,38 @@ async function page(csv, opts = {}) {
   const errors = [];
   const stored = {};
   const copies = [];
+  const intervals = [];
   let sharedClaims = [];
-  const context = vm.createContext({URL, URLSearchParams, crypto: require('node:crypto').webcrypto, setInterval: () => {}, console: { assert: (ok, msg) => {if (!ok) errors.push(msg);}, error: (...args) => errors.push(args)}, location: {href:opts.url || 'https://example.test/wishlist/', hash: opts.hash || ''}, document: {documentElement:root, createElement: tag => new Element(tag), getElementById: id => nodes[id] || walk(nodes.grid).find(n => n.id === id)}, window: { addEventListener: () => {} }, localStorage: {getItem: key => { if (opts.storageBlocked) throw Error(); return key === 'wishlist-theme' ? opts.theme : null; }, setItem: (k,v) => { if (opts.storageBlocked) throw Error(); stored[k] = v; }}, navigator: {clipboard: {writeText: async value => { if (opts.clipboardBlocked) throw Error(); copies.push(value); }}}, fetch: async (url, request) => { if (url === 'api/claims') { assert.ok(!opts.noAPI, 'Static Pages must not call the claims API'); if (request?.method === 'POST') { const data = JSON.parse(request.body); sharedClaims = data.action === 'claim' ? [data.item] : []; } return {ok:true, json:async () => ({claims:sharedClaims})}; } assert.equal(url,'items.csv'); if (opts.fetchFailed) throw Error(); return {ok: true, text: async () => csv};}});
+  const context = vm.createContext({
+    URL, URLSearchParams, crypto: require('node:crypto').webcrypto,
+    setInterval: (fn, delay) => intervals.push({fn, delay}),
+    console: { assert: (ok, msg) => {if (!ok) errors.push(msg);}, error: (...args) => errors.push(args)},
+    location: {href:opts.url || 'https://example.test/wishlist/', hash: opts.hash || ''},
+    document: {documentElement:root, createElement: tag => new Element(tag), getElementById: id => nodes[id] || walk(nodes.grid).find(n => n.id === id)},
+    window: { addEventListener: () => {} },
+    localStorage: {getItem: key => { if (opts.storageBlocked) throw Error(); return key === 'wishlist-theme' ? opts.theme : null; }, setItem: (k,v) => { if (opts.storageBlocked) throw Error(); stored[k] = v; }},
+    navigator: {clipboard: {writeText: async value => { if (opts.clipboardBlocked) throw Error(); copies.push(value); }}},
+    fetch: async (url, request) => {
+      if (url === 'api/claims') {
+        assert.ok(!opts.noAPI, 'Static Pages must not call the claims API');
+        if (request?.method === 'POST') { const data = JSON.parse(request.body); sharedClaims = data.action === 'claim' ? [data.item] : []; }
+        return {ok:true, json:async () => ({claims:sharedClaims})};
+      }
+      if (url === 'prices.json') {
+        assert.equal(request.cache, 'no-store');
+        if (opts.pricesFailed) throw Error('offline');
+        return {ok:Boolean(opts.prices), json:async () => opts.prices};
+      }
+      assert.equal(url,'items.csv');
+      assert.equal(request.cache,'no-cache');
+      if (opts.fetchFailed) throw Error();
+      return {ok: true, text: async () => csv};
+    }
+  });
   for (const script of scripts) vm.runInContext(script, context);
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(errors, []);
-  return {nodes, root, stored, copies, run: code => vm.runInContext(code, context)};
+  return {nodes, root, stored, copies, intervals, run: code => vm.runInContext(code, context)};
 }
 (async () => {
   const csv = fs.readFileSync('items.csv','utf8');
@@ -40,7 +66,7 @@ async function page(csv, opts = {}) {
   const legacy = await page(legacyCSV);
   const actualItems = actual.run('readItems(' + JSON.stringify(csv) + ')');
   const legacyItems = legacy.run('readItems(' + JSON.stringify(legacyCSV) + ')');
-  for (const key of ['name','price','note','link','image']) assert.equal(actualItems[0][key], legacyItems[0][key]);
+  for (const key of ['name','note','link','image']) assert.equal(actualItems[0][key], legacyItems[0][key]);
   assert.equal(actual.nodes.grid.children.length,actualItems.length);
   assert.equal(legacy.nodes.grid.children.length,1);
   assert.equal(legacyItems[0].priority,2);
@@ -50,7 +76,8 @@ async function page(csv, opts = {}) {
   assert.equal(legacy.nodes.title.textContent,"Ryan's wishlist");
   assert.ok(walk(actual.nodes.grid).some(n => n.className === 'ribbon'));
   assert.ok(!walk(legacy.nodes.grid).some(n => n.className === 'ribbon'));
-  for (const cls of ['note','tag','product']) assert.equal(walk(actual.nodes.grid).find(n => n.className === cls).textContent, walk(legacy.nodes.grid).find(n => n.className === cls).textContent);
+  for (const cls of ['note','product']) assert.equal(walk(actual.nodes.grid).find(n => n.className === cls).textContent, walk(legacy.nodes.grid).find(n => n.className === cls).textContent);
+  assert.equal(walk(legacy.nodes.grid).find(n => n.className === 'tag').textContent, '$856 CAD');
   assert.equal(walk(actual.nodes.grid).find(n => n.tagName === 'img').src, legacyItems[0].image);
   actual.nodes.theme.onclick(); assert.equal(actual.root.dataset.theme,'light'); assert.equal(actual.stored['wishlist-theme'],'light');
   assert.equal((await page(csv,{theme:'light'})).root.dataset.theme,'light');
@@ -108,6 +135,45 @@ async function page(csv, opts = {}) {
   assert.equal(test.run('parseCSV(\'a,"line 1\\nline 2",c\\r\\n\')[0][1]'),'line 1\nline 2');
   const empty = await page('name,price,note,link,image\n'); assert.equal(empty.nodes.count.textContent,'No wishes just yet. Check back soon.');
   const failed = await page('',{fetchFailed:true}); assert.ok(failed.nodes.count.textContent.startsWith("Couldn't load"));
+  const autoCSV = 'name,price,link,price_source,status\nShop,$999,https://shop.test/products/a,shopify,\nAmazon,$999,https://www.amazon.com/dp/B08KG4QVCT/?tag=owner-20,amazon,\nManual,$30,,,\nClaimed,,https://shop.test/products/b,shopify,claimed\n';
+  const now = Date.now();
+  const fresh = {status:'ok',source:'shopify',amount:119,currency:'USD',checked_at:new Date(now - 60000).toISOString(),expires_at:new Date(now + 3600000).toISOString()};
+  const prices = {version:1,items:{
+    'https://shop.test/products/a':fresh,
+    'https://www.amazon.com/dp/B08KG4QVCT/?tag=owner-20':{...fresh,source:'amazon',amount:249.99},
+    'https://shop.test/products/b':{...fresh,amount:1}
+  }};
+  const live = await page(autoCSV,{prices});
+  assert.deepEqual(walk(live.nodes.grid).filter(n => n.className === 'tag').map(n => n.textContent), ['$119.00 USD','$249.99 USD','$30','$1.00 USD']);
+  assert.ok(walk(live.nodes.grid).some(n => n.tagName === 'time' && n.attrs.datetime === fresh.checked_at));
+  assert.ok(walk(live.nodes.grid).some(n => n.tagName === 'summary' && n.textContent === 'Price details'));
+  const amazonCard = live.nodes.grid.children[1];
+  assert.ok(walk(amazonCard).find(n => n.className === 'product').href.endsWith('tag=owner-20'));
+  live.nodes.sort.value='low'; live.nodes.sort.onchange();
+  assert.deepEqual(live.nodes.grid.children.map(c => walk(c).find(n => n.tagName === 'h2').textContent), ['Manual','Shop','Amazon','Claimed']);
+  for (const overrides of [
+    {expires_at:new Date(now - 1).toISOString()},
+    {checked_at:new Date(now - 25*3600000).toISOString()},
+    {checked_at:'broken'}, {checked_at:new Date(now + 3600000).toISOString()},
+    {amount:0}, {amount:'119'}, {currency:'bad'}, {status:'unavailable'}, {source:'amazon'}
+  ]) {
+    const invalid = await page(autoCSV,{prices:{version:1,items:{'https://shop.test/products/a':{...fresh,...overrides}}}});
+    assert.ok(walk(invalid.nodes.grid.children[0]).some(n => n.textContent === 'Check price at the store'));
+    assert.ok(!walk(invalid.nodes.grid).some(n => n.textContent.includes('$999')));
+  }
+  const from = await page(autoCSV,{prices:{version:1,items:{'https://shop.test/products/a':{...fresh,from:true,currency:'CAD'}}}});
+  assert.ok(walk(from.nodes.grid).some(n => n.textContent === 'From $119.00 CAD'));
+  for (const opts of [{pricesFailed:true},{prices:{version:2,items:{}}}]) {
+    const fallback = await page(autoCSV,opts);
+    assert.equal(fallback.nodes.grid.children.length,4);
+    assert.ok(walk(fallback.nodes.grid).some(n => n.textContent === 'Check price on Amazon'));
+    assert.ok(walk(fallback.nodes.grid).some(n => n.textContent === '$30'));
+  }
+  live.run('Date.now = () => ' + (now + 26*3600000));
+  live.intervals.find(timer => timer.delay === 30000).fn();
+  assert.ok(!walk(live.nodes.grid).some(n => n.textContent === '$249.99 USD'));
+  assert.ok(walk(live.nodes.grid).some(n => n.textContent === 'Check price on Amazon'));
+  console.log('PASS: fresh feed prices/currencies/timestamps; affiliate URLs; live-price sorting with claims last; stale/invalid/missing feed fallbacks; expiry in long-open tabs; variable prices; legacy manual prices.');
   console.log('PASS: owner data preserved; current and legacy five-column rendering; reordered headers; quoted/multiline CSV; priority and both price sorts; missing prices last; statuses last; ribbons/stamps; filters; theme default/persistence/storage denial; shared tentative claims/undo; optional mailto; clipboard/fallback; unique slugs/deep links; empty/failure states.');
   console.log('Evidence: offline Node VM with a minimal DOM and stubbed CSV fetch. This is not browser/console or visual verification.');
 })().catch(error => { console.error(error); process.exitCode=1; });

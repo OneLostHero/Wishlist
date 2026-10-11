@@ -63,7 +63,7 @@ class ClaimsTest(unittest.TestCase):
         self.assertEqual(json.loads(self.request()[1]), {"claims": []})
 
     def test_private_files_cross_origin_and_csv_status(self):
-        for path in ("/.git/config", "/.wishlist/claims.sqlite3", "/server.py", "/../README.md"):
+        for path in ("/.git/config", "/.wishlist/claims.sqlite3", "/server.py", "/refresh_prices.py", "/../README.md"):
             self.assertEqual(self.request(path)[0], 404)
         self.assertEqual(self.request(action="claim", origin="https://unrelated.test")[0], 403)
         self.assertEqual(self.request(action="claim", token="short")[0], 400)
@@ -77,6 +77,13 @@ class ClaimsTest(unittest.TestCase):
             writer.writeheader()
             writer.writerows(items)
         self.assertEqual(self.request(action="claim")[0], 409)
+
+    def test_optional_public_price_feed(self):
+        self.assertEqual(self.request("/prices.json")[0], 404)
+        (self.root / "prices.json").write_text('{"version":1,"items":{}}', encoding="utf-8")
+        status, body = self.request("/prices.json")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {"version": 1, "items": {}})
 
 
 if __name__ == "__main__":

@@ -62,6 +62,7 @@ def make_server(host, port, root=ROOT, database=None):
             public = {"/": ("index.html", "text/html; charset=utf-8"),
                       "/index.html": ("index.html", "text/html; charset=utf-8"),
                       "/items.csv": ("items.csv", "text/csv; charset=utf-8"),
+                      "/prices.json": ("prices.json", "application/json; charset=utf-8"),
                       "/LICENSE": ("LICENSE", "text/plain; charset=utf-8")}
             if path not in public:
                 return self.json_response(404, {"error": "Not found"})
