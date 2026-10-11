@@ -362,7 +362,7 @@ function revealAnchor() {
 }
 $("sort").onchange = render;
 window.addEventListener("hashchange", revealAnchor);
-fetch("items.csv")
+fetch("items.csv", { cache: "no-cache" })
   .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
   .then(text => {
     items = readItems(text);
