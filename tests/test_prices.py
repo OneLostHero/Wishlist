@@ -2,7 +2,7 @@ import json
 import unittest
 from datetime import datetime, timezone
 
-from refresh_prices import Amazon, FetchError, amazon_identity, amazon_price, build_feed, shopify_price
+from refresh_prices import Amazon, FetchError, amazon_identity, amazon_price, build_feed, shopify_price, usd_price
 
 
 NOW = datetime(2026, 10, 11, 12, tzinfo=timezone.utc)
@@ -40,7 +40,7 @@ class PricesTest(unittest.TestCase):
         self.assertEqual(price["amount"], 120.5)
         self.assertEqual(price["currency"], "CAD")
         self.assertFalse(price["from"])
-        self.assertEqual([call[0] for call in client.calls], ["https://shop.test/cart.js", SHOP + ".js"])
+        self.assertEqual([call[0] for call in client.calls], ["https://shop.test/cart.js?currency=USD", SHOP + ".js?currency=USD"])
 
     def test_shopify_available_range_locale_and_sold_out_variant(self):
         product = {"variants": [variant(1, 100, False), variant(2, 2500), variant(3, 3500)]}
@@ -48,10 +48,40 @@ class PricesTest(unittest.TestCase):
         price = shopify_price("https://shop.test/en-us/products/book", client)
         self.assertEqual(price["amount"], 25)
         self.assertTrue(price["from"])
-        self.assertEqual(client.calls[0][0], "https://shop.test/en-us/cart.js")
+        self.assertEqual(client.calls[0][0], "https://shop.test/en-us/cart.js?currency=USD")
         for suffix, reason in (("?variant=1", "unavailable"), ("?variant=9", "variant_not_found")):
             with self.assertRaisesRegex(FetchError, reason):
                 shopify_price(SHOP + suffix, FakeClient([{"currency": "USD"}, product]))
+
+    def test_usd_offer_needs_no_conversion_and_foreign_offer_is_labelled(self):
+        price = {"amount": 857, "currency": "CAD", "from": False}
+        rate = {"base": "CAD", "quote": "USD", "rate": 0.70277, "date": "2026-10-09"}
+        client, rates = FakeClient([rate]), {}
+        native = {"amount": 600, "currency": "USD"}
+        self.assertEqual(usd_price(native, client, rates, NOW), native)
+        self.assertEqual(client.calls, [])
+        converted = usd_price(price, client, rates, NOW)
+        self.assertEqual(converted["amount"], 602.27)
+        self.assertEqual(converted["currency"], "USD")
+        self.assertTrue(converted["estimate"])
+        self.assertEqual(converted["original_amount"], 857)
+        self.assertEqual(converted["original_currency"], "CAD")
+        self.assertEqual(converted["fx_date"], "2026-10-09")
+        self.assertEqual(usd_price(price, client, rates, NOW), converted)
+        self.assertEqual(len(client.calls), 1)
+
+    def test_bad_exchange_rates_do_not_display_foreign_or_guessed_prices(self):
+        price = {"amount": 100, "currency": "CAD"}
+        rate = {"base": "CAD", "quote": "USD", "rate": 0.7, "date": "2026-10-09"}
+        for changes in ({"date": "2026-09-01"}, {"date": "2026-10-12"}, {"date": "bad"},
+                        {"base": "USD"}, {"quote": "CAD"}, {"rate": 0}, {"rate": "0.7"}):
+            with self.assertRaises(FetchError):
+                usd_price(price, FakeClient([{**rate, **changes}]), {}, NOW)
+        feed = build_feed([{"name": "Mask", "link": SHOP, "price_source": "shopify"}],
+                          FakeClient([{"currency": "CAD"}, {"variants": [variant(1, 85700)]}, FetchError("network_error")]),
+                          env={}, clock=lambda: NOW)
+        self.assertEqual(feed["items"][SHOP]["status"], "unavailable")
+        self.assertNotIn("amount", feed["items"][SHOP])
 
     def test_invalid_prices_never_become_zero_or_guessed_currency(self):
         for price in (0, -1, "11900", None, float("nan")):
@@ -85,6 +115,7 @@ class PricesTest(unittest.TestCase):
         url, body, headers = client.calls[1]
         self.assertEqual(url, "https://creatorsapi.amazon/catalog/v1/getItems")
         self.assertEqual(body["condition"], "New")
+        self.assertEqual(body["currencyOfPreference"], "USD")
         self.assertEqual(body["partnerTag"], "owner-20")
         self.assertEqual(headers["x-marketplace"], "www.amazon.com")
         self.assertEqual(headers["Authorization"], "Bearer private-token")

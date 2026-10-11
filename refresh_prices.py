@@ -10,7 +10,8 @@ import math
 import os
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http.cookiejar import CookieJar
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -73,10 +74,11 @@ def shopify_price(link, client):
     match = re.fullmatch(r"(.*?)/products/([^/]+)/?", url.path)
     if url.scheme != "https" or not url.hostname or not match:
         raise FetchError("invalid_product_url")
-    product_url = urlunsplit((url.scheme, url.netloc, url.path.rstrip("/") + ".js", "", ""))
-    # Locale-aware routes and the same cookie jar keep amount and currency paired.
+    product_url = urlunsplit((url.scheme, url.netloc, url.path.rstrip("/") + ".js", "currency=USD", ""))
+    # Request USD on BOTH routes: the currency query does not persist in cookies.
+    # Read the returned currency, since not every shop supports USD.
     prefix = match[1].split("/collections/")[0]
-    cart_url = urlunsplit((url.scheme, url.netloc, prefix + "/cart.js", "", ""))
+    cart_url = urlunsplit((url.scheme, url.netloc, prefix + "/cart.js", "currency=USD", ""))
     currency = client.json(cart_url)["currency"]
     product = client.json(product_url)
     variants = product["variants"]
@@ -93,6 +95,33 @@ def shopify_price(link, client):
         raise FetchError("invalid_price")
     return {"amount": min(amounts) / 100, "currency": currency,
             "from": min(amounts) != max(amounts), "availability": "available"}
+
+
+def usd_price(price, client, rates, now):
+    """Prefer the shop's USD offer; otherwise publish a dated USD estimate."""
+    currency = price["currency"]
+    if currency == "USD":
+        return price
+    if currency not in rates:
+        rates[currency] = client.json(f"https://api.frankfurter.dev/v2/rate/{currency}/USD")
+    rate = rates[currency]
+    if (rate.get("base") != currency or rate.get("quote") != "USD"
+            or not valid_money(rate.get("rate"), "USD")):
+        raise FetchError("invalid_exchange_rate")
+    try:
+        age = (now.date() - date.fromisoformat(rate["date"])).days
+    except (KeyError, TypeError, ValueError):
+        raise FetchError("invalid_exchange_rate") from None
+    # Allow weekends/holidays, but never silently use an old or future rate.
+    if not 0 <= age <= 7:
+        raise FetchError("stale_exchange_rate")
+    amount = float((Decimal(str(price["amount"])) * Decimal(str(rate["rate"])))
+                   .quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    if not valid_money(amount, "USD"):
+        raise FetchError("invalid_exchange_rate")
+    return {**price, "amount": amount, "currency": "USD", "estimate": True,
+            "original_amount": price["amount"], "original_currency": currency,
+            "fx_rate": rate["rate"], "fx_date": rate["date"]}
 
 
 def amazon_identity(link):
@@ -149,6 +178,7 @@ def amazon_price(item):
 def build_feed(rows, client=None, env=None, clock=utc_now):
     client = client or Client()
     amazon = Amazon(client, os.environ if env is None else env)
+    rates = {}
     prices = {}
     for row in rows:
         source, link = row.get("price_source", "").strip(), row.get("link", "").strip()
@@ -161,12 +191,15 @@ def build_feed(rows, client=None, env=None, clock=utc_now):
             else:
                 asin, tag = amazon_identity(link)
                 result = amazon_price(amazon.item(asin, tag))
+                if result["currency"] != "USD":
+                    raise FetchError("usd_offer_unavailable")
+            result = usd_price(result, client, rates, clock())
             checked = clock()
             entry.update(result, status="ok", checked_at=timestamp(checked),
                          expires_at=timestamp(checked + MAX_AGE))
         except FetchError as error:
             entry.update(status="unavailable", reason=str(error))
-        except (KeyError, TypeError, ValueError, AttributeError):
+        except (KeyError, TypeError, ValueError, AttributeError, InvalidOperation):
             entry.update(status="unavailable", reason="invalid_response")
         prices[link] = entry
         # Only known error codes and public item names; never log API responses.

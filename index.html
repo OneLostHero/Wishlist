@@ -127,7 +127,7 @@ try {
     </div>
     <p class="count" id="count" role="status">Loading the wishlist…</p>
     <p class="count" id="claim-help" hidden>Claimed items are updated by Ryan.</p>
-    <p class="count" id="price-help" hidden>Prices refresh about every 6 hours. Currencies are shown as listed; price sorting does not convert them. Check the store for the final price, shipping and tax.</p>
+    <p class="count" id="price-help" hidden>Prices are shown in USD and refresh about every 6 hours. Converted prices are marked as estimates. Check the store for the final price, shipping and tax.</p>
     <p class="notice" id="notice" role="status"></p>
     <label class="copy-fallback" id="copy-fallback" hidden>Copy this link manually:<input id="copy-value" readonly></label>
     <div class="grid" id="grid"></div>
@@ -231,13 +231,14 @@ function pricedItem(item, now = Date.now()) {
     Number.isFinite(checked) && checked <= now + 300000 &&
     now < Math.min(expires, checked + 86400000) &&
     typeof entry.amount === "number" && Number.isFinite(entry.amount) && entry.amount > 0 &&
-    typeof entry.currency === "string" && /^[A-Z]{3}$/.test(entry.currency);
+    entry.currency === "USD";
   if (!fresh) return { ...item, price: "", amount: null,
     priceFallback: item.price_source === "amazon" ? "Check price on Amazon" : "Check price at the store" };
   const price = new Intl.NumberFormat("en-US", { style: "currency", currency: entry.currency,
     currencyDisplay: "narrowSymbol" }).format(entry.amount) + " " + entry.currency;
-  return { ...item, price: (entry.from ? "From " : "") + price, amount: entry.amount,
-    priceChecked: entry.checked_at, pricePreorder: entry.availability === "preorder" };
+  return { ...item, price: (entry.from ? "From " : "") + (entry.estimate ? "≈ " : "") + price, amount: entry.amount,
+    priceChecked: entry.checked_at, pricePreorder: entry.availability === "preorder",
+    priceConversion: entry.estimate ? `USD estimate; store charges ${entry.original_currency}. Exchange rate dated ${entry.fx_date}.` : "" };
 }
 async function refreshPrices() {
   try {
@@ -362,6 +363,7 @@ function makeCard(item) {
     const checked = element("time", "price-note", `${item.pricePreorder ? "Pre-order · " : ""}Checked ${new Date(item.priceChecked).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`);
     checked.setAttribute("datetime", item.priceChecked);
     price.append(element("br", ""), checked);
+    if (item.priceConversion) price.append(element("p", "price-note", item.priceConversion));
     if (item.price_source === "amazon") {
       const details = element("details", "price-details");
       details.append(element("summary", "", "Price details"));

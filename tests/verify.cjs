@@ -66,7 +66,8 @@ async function page(csv, opts = {}) {
   const legacy = await page(legacyCSV);
   const actualItems = actual.run('readItems(' + JSON.stringify(csv) + ')');
   const legacyItems = legacy.run('readItems(' + JSON.stringify(legacyCSV) + ')');
-  for (const key of ['name','note','link','image']) assert.equal(actualItems[0][key], legacyItems[0][key]);
+  for (const key of ['name','note','image']) assert.equal(actualItems[0][key], legacyItems[0][key]);
+  assert.equal(actualItems[0].link, legacyItems[0].link + '?currency=USD');
   assert.equal(actual.nodes.grid.children.length,actualItems.length);
   assert.equal(legacy.nodes.grid.children.length,1);
   assert.equal(legacyItems[0].priority,2);
@@ -155,14 +156,15 @@ async function page(csv, opts = {}) {
     {expires_at:new Date(now - 1).toISOString()},
     {checked_at:new Date(now - 25*3600000).toISOString()},
     {checked_at:'broken'}, {checked_at:new Date(now + 3600000).toISOString()},
-    {amount:0}, {amount:'119'}, {currency:'bad'}, {status:'unavailable'}, {source:'amazon'}
+    {amount:0}, {amount:'119'}, {currency:'bad'}, {currency:'CAD'}, {status:'unavailable'}, {source:'amazon'}
   ]) {
     const invalid = await page(autoCSV,{prices:{version:1,items:{'https://shop.test/products/a':{...fresh,...overrides}}}});
     assert.ok(walk(invalid.nodes.grid.children[0]).some(n => n.textContent === 'Check price at the store'));
     assert.ok(!walk(invalid.nodes.grid).some(n => n.textContent.includes('$999')));
   }
-  const from = await page(autoCSV,{prices:{version:1,items:{'https://shop.test/products/a':{...fresh,from:true,currency:'CAD'}}}});
-  assert.ok(walk(from.nodes.grid).some(n => n.textContent === 'From $119.00 CAD'));
+  const from = await page(autoCSV,{prices:{version:1,items:{'https://shop.test/products/a':{...fresh,from:true,estimate:true,original_currency:'CAD',fx_date:'2026-10-09'}}}});
+  assert.ok(walk(from.nodes.grid).some(n => n.textContent === 'From ≈ $119.00 USD'));
+  assert.ok(walk(from.nodes.grid).some(n => n.textContent === 'USD estimate; store charges CAD. Exchange rate dated 2026-10-09.'));
   for (const opts of [{pricesFailed:true},{prices:{version:2,items:{}}}]) {
     const fallback = await page(autoCSV,opts);
     assert.equal(fallback.nodes.grid.children.length,4);

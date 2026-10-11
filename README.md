@@ -25,7 +25,7 @@ The card title. Plain text, any characters. If it contains a comma, quote it.
 
 #### `price` (optional)
 
-For manual prices (blank `price_source`), free text shown on the little gift tag exactly as written. Price sorting uses the **first number** (including decimals and comma-grouped thousands); prices with no number go last within their availability group. Currencies are not converted. An automatic source overrides this field and never falls back to an undated manual price.
+For manual prices (blank `price_source`), free text shown on the little gift tag exactly as written. Use **USD** for new manual numeric prices. Legacy manual text is preserved without trying to interpret or convert it. Price sorting uses the **first number** (including decimals and comma-grouped thousands); prices with no number go last within their availability group. An automatic source overrides this field and never falls back to an undated manual price.
 
 - ✅ `~$120` · `$30–50` · `under $25` · `any amount`
 - ✅ empty — the tag is simply omitted
@@ -33,11 +33,13 @@ For manual prices (blank `price_source`), free text shown on the little gift tag
 
 #### `price_source` (optional)
 
-- `shopify` — fetch the linked Shopify product using its public Ajax product API and use the same session's cart currency. Include `?variant=...` in the link to choose an exact variant. Without a variant, the lowest available price is shown with “From” when available variants have different prices.
+- `shopify` — fetch the linked Shopify product using its public Ajax product API, requesting `currency=USD` on both product and cart routes and verifying the returned currency. Include `?variant=...` in the link to choose an exact variant (combine with `&currency=USD` for USD store links). Without a variant, the lowest available price is shown with “From” when available variants have different prices.
 - `amazon` — fetch an Amazon.com `/dp/ASIN` or `/gp/product/ASIN` link through Amazon Creators API. The URL must include the Associates `tag`. Requires eligible API access and the two repository secrets described below. Only public, new-condition offers are displayed; restricted, membership, subscription and temporary deal prices are omitted.
 - Blank — keep the original manual `price` behavior, including text such as `Varies by volume / edition`. Use this for a whole series, gift cards, or retailers without an integration.
 
-Automatic prices include the currency and time checked. If the source fails, is unavailable, or is too old, the card asks the visitor to check the store. No zero, guessed price, or stale manual price replaces a failed lookup. Future integrations belong in `refresh_prices.py`; a retailer URL alone does not guarantee that it exposes an accessible price feed.
+Automatic prices are always displayed and sorted in **USD**, with a time checked. The store's own USD offer takes priority. If a Shopify store only returns another currency, the updater converts it using [Frankfurter's daily exchange-rate API](https://frankfurter.dev/) and marks the amount with `≈`, the store's currency and the rate date. Rates older than seven days, future dates, invalid responses or failed conversions hide the price instead of displaying another currency or guessing. No conversion is needed for the current mask ($600 USD) or civilization book ($119 USD), as checked on October 11, 2026. Amazon is explicitly requested in USD; unexpected foreign-currency Amazon offers are omitted.
+
+If the source fails, is unavailable, or is too old, the card asks the visitor to check the store. No zero, guessed price, or stale manual price replaces a failed lookup. Future integrations belong in `refresh_prices.py`; a retailer URL alone does not guarantee that it exposes an accessible price feed.
 
 #### `note` (optional)
 
@@ -175,7 +177,7 @@ node tests/verify.cjs
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-The Node checks cover current and legacy CSV rendering, filters, sorts, themes, tentative marks/undo, copy-link fallback, current/stale/failed price feeds and price expiry in long-open tabs. Python checks cover Shopify currencies/variants, Amazon offer restrictions and credential isolation, partial source failures, and the claims server's persistence, undo authorization and private-file isolation. Tests mock retailer responses; run `python refresh_prices.py` to check real source access. Node is only needed for checks, not to run the app.
+The Node checks cover current and legacy CSV rendering, filters, sorts, themes, tentative marks/undo, copy-link fallback, current/stale/failed price feeds, USD-only automatic prices, labelled conversions and price expiry in long-open tabs. Python checks cover Shopify currencies/variants, USD preference, exchange-rate dates and failures, Amazon offer restrictions and credential isolation, partial source failures, and the claims server's persistence, undo authorization and private-file isolation. Tests mock retailer responses; run `python refresh_prices.py` to check real source access. Node is only needed for checks, not to run the app.
 
 ## Credits & license
 
