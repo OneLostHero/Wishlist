@@ -73,9 +73,11 @@ try {
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 24px; align-items: stretch; }
   .card { min-width: 0; position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; scroll-margin-top: 24px; }
   .card:target { outline: 3px solid var(--accent); outline-offset: 5px; }
+  .image-link { display: block; }
+  .image-link:focus-visible { outline-offset: -4px; }
   .card img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--wash); }
   .card.unavailable img { filter: grayscale(1); opacity: .6; }
-  .ribbon { position: absolute; top: 16px; left: 0; z-index: 1; background: var(--accent-solid); color: var(--accent-ink); padding: 7px 18px 7px 13px; font-size: .7rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%); }
+  .ribbon { position: absolute; top: 16px; left: 0; z-index: 1; pointer-events: none; background: var(--accent-solid); color: var(--accent-ink); padding: 7px 18px 7px 13px; font-size: .7rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%); }
   .card.no-image .ribbon { position: static; align-self: flex-start; margin-top: 16px; }
   .body { padding: 22px; display: flex; flex-direction: column; flex: 1; align-items: flex-start; overflow-wrap: anywhere; }
   .category { color: var(--accent); font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 9px; }
@@ -284,6 +286,7 @@ async function changeClaim(item, release = false) {
   } finally { pendingClaim = ""; render(); }
 }
 function makeCard(item) {
+  const hasLink = /^https?:\/\//i.test(item.link);
   const card = element("article", "card" + (item.status ? " unavailable" : "") + (!item.image ? " no-image" : ""));
   card.id = item.slug;
   card.setAttribute("aria-labelledby", item.slug + "--heading");
@@ -292,8 +295,16 @@ function makeCard(item) {
     const img = element("img", "");
     img.src = item.image;
     img.alt = "";
-    img.onerror = () => { img.remove(); card.classList.add("no-image"); };
-    card.append(img);
+    const picture = hasLink ? element("a", "image-link") : img;
+    if (hasLink) {
+      picture.href = item.link;
+      picture.target = "_blank";
+      picture.rel = "noopener";
+      picture.setAttribute("aria-label", `View ${item.name} (opens in a new tab)`);
+      picture.append(img);
+    }
+    img.onerror = () => { picture.remove(); card.classList.add("no-image"); };
+    card.append(picture);
   }
   const body = element("div", "body");
   if (item.category) body.append(element("p", "category", item.category));
@@ -304,7 +315,7 @@ function makeCard(item) {
   if (item.price) body.append(element("span", "tag", item.price));
   if (item.status) body.append(element("span", "stamp", item.status === "tentative" ? "Possibly taken" : item.status));
   const actions = element("div", "actions");
-  if (/^https?:\/\//i.test(item.link)) {
+  if (hasLink) {
     const link = element("a", "product", "View item ↗");
     link.href = item.link;
     link.target = "_blank";
