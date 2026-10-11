@@ -58,7 +58,7 @@ Full URL to the product page. Becomes the "View item →" link; omitted if empty
 - ❌ `example.com/product/123` — no `https://`, so the product link is omitted
 - ❌ `www.amazon.com/dp/XYZ` — same problem; always include the scheme
 
-Amazon links use Ryan's Associates tracking ID, `onelosthero0d-20`. Preserve the `tag=onelosthero0d-20` query parameter when editing these URLs. Tagged Amazon.com links are labelled "Paid link" and retain the same destination on the photo and product link. Keep the affiliate disclosure above the list when publishing affiliate links.
+Amazon links use Ryan's Associates tracking ID, `onelosthero0d-20`. Preserve the `tag=onelosthero0d-20` query parameter when editing these URLs. All item links display "View item ↗"; tagged Amazon links retain `rel="sponsored noopener"` and the same destination on the photo and product link. Keep the affiliate disclosure above the list when publishing affiliate links.
 
 #### `image` (optional)
 

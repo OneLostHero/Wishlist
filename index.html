@@ -345,7 +345,7 @@ function makeCard(item) {
       picture.href = item.link;
       picture.target = "_blank";
       picture.rel = paidLink ? "sponsored noopener" : "noopener";
-      picture.setAttribute("aria-label", `View ${item.name} (${paidLink ? "paid link; " : ""}opens in a new tab)`);
+      picture.setAttribute("aria-label", `View ${item.name} (opens in a new tab)`);
       picture.append(img);
     }
     img.onerror = () => { picture.remove(); card.classList.add("no-image"); };
@@ -377,7 +377,7 @@ function makeCard(item) {
   if (item.status) body.append(element("span", "stamp", item.status === "tentative" ? "Possibly taken" : item.status));
   const actions = element("div", "actions");
   if (hasLink) {
-    const link = element("a", "product", paidLink ? "View item ↗ · Paid link" : "View item ↗");
+    const link = element("a", "product", "View item ↗");
     link.href = item.link;
     link.target = "_blank";
     link.rel = paidLink ? "sponsored noopener" : "noopener";
