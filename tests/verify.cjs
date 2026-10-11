@@ -23,7 +23,7 @@ async function page(csv, opts = {}) {
   const stored = {};
   const copies = [];
   let sharedClaims = [];
-  const context = vm.createContext({URL, URLSearchParams, crypto: require('node:crypto').webcrypto, setInterval: () => {}, console: { assert: (ok, msg) => {if (!ok) errors.push(msg);}, error: (...args) => errors.push(args)}, location: {href:'https://example.test/wishlist/', hash: opts.hash || ''}, document: {documentElement:root, createElement: tag => new Element(tag), getElementById: id => nodes[id] || walk(nodes.grid).find(n => n.id === id)}, window: { addEventListener: () => {} }, localStorage: {getItem: key => { if (opts.storageBlocked) throw Error(); return key === 'wishlist-theme' ? opts.theme : null; }, setItem: (k,v) => { if (opts.storageBlocked) throw Error(); stored[k] = v; }}, navigator: {clipboard: {writeText: async value => { if (opts.clipboardBlocked) throw Error(); copies.push(value); }}}, fetch: async (url, request) => { if (url === 'api/claims') { if (request?.method === 'POST') { const data = JSON.parse(request.body); sharedClaims = data.action === 'claim' ? [data.item] : []; } return {ok:true, json:async () => ({claims:sharedClaims})}; } assert.equal(url,'items.csv'); if (opts.fetchFailed) throw Error(); return {ok: true, text: async () => csv};}});
+  const context = vm.createContext({URL, URLSearchParams, crypto: require('node:crypto').webcrypto, setInterval: () => {}, console: { assert: (ok, msg) => {if (!ok) errors.push(msg);}, error: (...args) => errors.push(args)}, location: {href:opts.url || 'https://example.test/wishlist/', hash: opts.hash || ''}, document: {documentElement:root, createElement: tag => new Element(tag), getElementById: id => nodes[id] || walk(nodes.grid).find(n => n.id === id)}, window: { addEventListener: () => {} }, localStorage: {getItem: key => { if (opts.storageBlocked) throw Error(); return key === 'wishlist-theme' ? opts.theme : null; }, setItem: (k,v) => { if (opts.storageBlocked) throw Error(); stored[k] = v; }}, navigator: {clipboard: {writeText: async value => { if (opts.clipboardBlocked) throw Error(); copies.push(value); }}}, fetch: async (url, request) => { if (url === 'api/claims') { assert.ok(!opts.noAPI, 'Static Pages must not call the claims API'); if (request?.method === 'POST') { const data = JSON.parse(request.body); sharedClaims = data.action === 'claim' ? [data.item] : []; } return {ok:true, json:async () => ({claims:sharedClaims})}; } assert.equal(url,'items.csv'); if (opts.fetchFailed) throw Error(); return {ok: true, text: async () => csv};}});
   for (const script of scripts) vm.runInContext(script, context);
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(errors, []);
@@ -33,6 +33,10 @@ async function page(csv, opts = {}) {
   const csv = fs.readFileSync('items.csv','utf8');
   const legacyCSV = fs.readFileSync('tests/fixtures/legacy.csv','utf8');
   const actual = await page(csv);
+  const publicPage = await page(csv, {url:'https://onelosthero.github.io/Wishlist/', noAPI:true});
+  assert.ok(!walk(publicPage.nodes.grid).some(n => n.className === 'button claim'));
+  assert.equal(publicPage.nodes['claim-help'].hidden, false);
+  assert.equal(publicPage.run('shareURL()'), 'https://onelosthero.github.io/Wishlist/');
   const legacy = await page(legacyCSV);
   const actualItems = actual.run('readItems(' + JSON.stringify(csv) + ')');
   const legacyItems = legacy.run('readItems(' + JSON.stringify(legacyCSV) + ')');

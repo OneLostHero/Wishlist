@@ -2,11 +2,13 @@
 
 Ryan's wishlist: a personal gift list with a dark, grown-up gift-tag design. Item content lives in `items.csv`; shared "Possibly taken" marks are saved by `server.py` in a local SQLite database. No build step or third-party dependencies. Requires Python 3.10 or later to run the server.
 
+Public wishlist: **https://onelosthero.github.io/Wishlist/**. The GitHub Pages version displays the list and owner-managed claimed statuses. Visitor marking is available when running the local Python server.
+
 This is our own version of [Wishlist](https://github.com/Lickitysplitted/Wishlist) by **Lickitysplitted**. See [Credits & license](#credits--license).
 
 ## How to add / edit items
 
-Edit `items.csv`, then refresh the page. Commit changes locally; this repository is not pushed or published automatically.
+Edit `items.csv`, then refresh the local page. To update the public site, commit and push to `main`; the Publish wishlist workflow checks and deploys the site automatically. Change an item's `status` to `claimed` or `bought` to mark it publicly, or clear the field to make it available again.
 
 ### CSV columns
 
@@ -107,6 +109,7 @@ Edit the `CONFIG` object at the top of `index.html`:
 - `name` — the heading and browser title; defaults to `Ryan's wishlist`.
 - `intro` — the short introduction beneath the heading (plain text).
 - `contact` — optional `sms:+15551234567` or `mailto:you@example.com` for the header contact link. Blank by default. Gift buttons save a tentative mark and do not use this setting.
+- `claimsAPI` — endpoint for visitor marking; automatically disabled on `*.github.io`, where statuses come from the CSV. Set it to an empty string for any other static host, or a hosted API URL when one is available. The local server uses `api/claims`.
 - `shareURL` — your full public URL, including any path and trailing slash. Leave blank to share the current page URL.
 
 The header has a wishlist copy button; each card has its own copy button with a `#item-name` anchor. Names generate the anchors, with suffixes for duplicates. Renaming an item changes its anchor. Copying uses `navigator.clipboard` on HTTPS or localhost, with a selectable-link fallback if clipboard access is unavailable.
@@ -115,7 +118,9 @@ Dark is the default even on a device set to light mode. Visitors can explicitly 
 
 ## Hosting
 
-Run `server.py` for shared marks. GitHub Pages or another static host can display the list, filters, themes and copy links, but cannot save visitor marks; gift buttons remain disabled without the API. Public hosting of the full app needs the Python server with persistent storage behind HTTPS. This checkout is local only; nothing is pushed or deployed automatically. Product photos still load from their existing external URLs.
+The public repository is [OneLostHero/Wishlist](https://github.com/OneLostHero/Wishlist), with GitHub Pages deploying via `.github/workflows/pages.yml`. The workflow publishes only `index.html`, `items.csv` and `LICENSE`. Local databases, logs, server code and tests are not part of the website artifact.
+
+GitHub Pages displays the list, category filters, sorting, themes, copy links and CSV `claimed`/`bought` stamps. Visitor marking buttons are hidden because Pages cannot run the claims API. Run `server.py` locally for shared tentative marks; those marks are not synchronized with the public CSV. Product photos load from their existing external URLs.
 
 ## Notes for AI assistants
 

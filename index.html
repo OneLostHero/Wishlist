@@ -14,8 +14,10 @@
 // Personalize the site here. No build step required.
 const CONFIG = {
   name: "Ryan's wishlist",
-  intro: "A few things I'd love, collected in one little list. Thinking of getting something? Mark it as possibly taken so nobody doubles up.",
+  intro: "A few things I'd love, collected in one little list. Thanks for thinking of me.",
   contact: "", // Optional contact link, for example mailto:you@example.com.
+  // GitHub Pages shows statuses from items.csv. Local hosting supports visitor marks.
+  claimsAPI: new URL(location.href).hostname.endsWith(".github.io") ? "" : "api/claims",
   shareURL: "" // Your public URL; blank uses the current page URL.
 };
 // Dark is always the default, regardless of the device's color preference.
@@ -113,6 +115,7 @@ try {
       <label class="sort">Sort by <select id="sort"><option value="priority">Most wanted</option><option value="low">Price low → high</option><option value="high">Price high → low</option></select></label>
     </div>
     <p class="count" id="count" role="status">Loading the wishlist…</p>
+    <p class="count" id="claim-help" hidden>Claimed items are updated by Ryan.</p>
     <p class="notice" id="notice" role="status"></p>
     <label class="copy-fallback" id="copy-fallback" hidden>Copy this link manually:<input id="copy-value" readonly></label>
     <div class="grid" id="grid"></div>
@@ -241,8 +244,9 @@ function saveClaimTokens() {
   try { localStorage.setItem("wishlist-claims", JSON.stringify(claimTokens)); } catch { /* Keep tokens in memory for this visit. */ }
 }
 async function refreshClaims() {
+  if (!CONFIG.claimsAPI) return;
   try {
-    const response = await fetch("api/claims", { cache: "no-store" });
+    const response = await fetch(CONFIG.claimsAPI, { cache: "no-store" });
     if (!response.ok) throw new Error();
     const data = await response.json();
     if (!Array.isArray(data.claims)) throw new Error();
@@ -261,7 +265,7 @@ async function changeClaim(item, release = false) {
   saveClaimTokens();
   render();
   try {
-    const response = await fetch("api/claims", {
+    const response = await fetch(CONFIG.claimsAPI, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ item: item.slug, token: claimTokens[item.slug], action: release ? "release" : "claim" })
     });
@@ -308,7 +312,7 @@ function makeCard(item) {
     actions.append(link);
   }
   const canUndo = item.status === "tentative" && Boolean(claimTokens[item.slug]);
-  if (!item.status || canUndo) {
+  if (CONFIG.claimsAPI && (!item.status || canUndo)) {
     const claim = element("button", "button claim", canUndo ? "Undo my mark" : "I might get this");
     claim.type = "button";
     claim.disabled = !claimsReady || Boolean(pendingClaim);
@@ -360,10 +364,13 @@ fetch("items.csv")
       $("categories").append(chip);
     }
     $("controls").hidden = false;
+    $("claim-help").hidden = Boolean(CONFIG.claimsAPI);
     render();
     refreshClaims().then(revealAnchor);
-    setInterval(() => { if (!document.hidden && !pendingClaim) refreshClaims(); }, 15000);
-    window.addEventListener("focus", refreshClaims);
+    if (CONFIG.claimsAPI) {
+      setInterval(() => { if (!document.hidden && !pendingClaim) refreshClaims(); }, 15000);
+      window.addEventListener("focus", refreshClaims);
+    }
   })
   .catch(() => {
     $("count").textContent = "Couldn't load items.csv. Check the file and its name header, and serve this page through a web server (or GitHub Pages).";

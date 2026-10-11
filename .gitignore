@@ -5,3 +5,4 @@ _tmp/
 .playwright-mcp/
 .wishlist/
 __pycache__/
+_site/
