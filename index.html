@@ -1,9 +1,14 @@
 <!DOCTYPE html>
+<!--
+  Wishlist — Promethean Robotics version.
+  Based on Wishlist by Lickitysplitted (https://github.com/Lickitysplitted/Wishlist).
+  Modified by Promethean Robotics, 2026-10-11. Licensed GPL-3.0-or-later; see LICENSE.
+-->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lickity's Wish List</title>
+<title>Promethean Robotics Wishlist</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;600;800&display=swap" rel="stylesheet">
@@ -14,7 +19,7 @@
     --card: #ffffff;
     --ink: #21242a;
     --muted: #6b7280;
-    --accent: #d1495b;     /* raspberry, carried over from v1 */
+    --accent: #c2410c;     /* ember orange — Promethean Robotics */
     --tag-paper: #faf6ec;  /* the little price tag */
   }
 
@@ -153,6 +158,11 @@
     color: var(--muted);
     font-size: 0.95rem;
   }
+  footer .credit {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+  footer a { color: inherit; }
 
   @media (prefers-reduced-motion: reduce) {
     .card { transition: none; }
@@ -163,10 +173,10 @@
 <body>
 
 <header>
-  <h1>Lickity's <em>Wish List</em></h1>
+  <h1>Promethean Robotics <em>Wishlist</em></h1>
   <p>
-    A few things I'd genuinely love. No pressure at all —
-    <strong>if you pick one, text Nola before buying so nobody doubles up!</strong>
+    Parts, tools and gear we'd love to have.
+    <strong>If you pick something up, let us know first so nobody doubles up!</strong>
   </p>
 </header>
 
@@ -253,7 +263,8 @@ fetch("items.csv")
 </script>
 
 <footer>
-  <p>Thanks for thinking of me ♥ — updated whenever I think of something new.</p>
+  <p>Thanks for supporting Promethean Robotics ♥ — updated whenever we think of something new.</p>
+  <p class="credit">Based on <a href="https://github.com/Lickitysplitted/Wishlist">Wishlist</a> by Lickitysplitted · GPL-3.0</p>
 </footer>
 
 </body>

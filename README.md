@@ -1,6 +1,8 @@
 # Wishlist
 
-A gift wishlist rendered as a card grid on GitHub Pages. All content lives in `items.csv` — `index.html` fetches and renders it in the browser. No build step, no dependencies.
+Promethean Robotics' wishlist: parts, tools and gear we'd like to have, shown as a card grid on GitHub Pages. All content lives in `items.csv`. `index.html` fetches it and renders it in the browser. No build step, no dependencies.
+
+This is our own version of [Wishlist](https://github.com/Lickitysplitted/Wishlist) by **Lickitysplitted**. See [Credits & license](#credits--license).
 
 ## How to add / edit items
 
@@ -82,3 +84,9 @@ Bookstore gift card,any amount,"Always a safe bet — no photo needed.",https://
 python -m http.server
 # then visit http://localhost:8000
 ```
+
+## Credits & license
+
+- Original project: [Wishlist](https://github.com/Lickitysplitted/Wishlist) by Lickitysplitted (Chris Hawkins). The page design, CSV format and parser, and most of this README come from that project.
+- Modified by Promethean Robotics on 2026-10-11: rebranded the title, header, accent colour and footer, added the attribution credit, and rewrote the README intro.
+- Licensed under the GNU General Public License v3.0, the same license as the original. See [`LICENSE`](LICENSE). Any redistribution, including the published Pages site, must keep the credit and the license.
