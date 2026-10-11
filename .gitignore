@@ -3,3 +3,5 @@
 
 _tmp/
 .playwright-mcp/
+.wishlist/
+__pycache__/

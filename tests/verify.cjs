@@ -1,0 +1,109 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const html = fs.readFileSync('index.html', 'utf8');
+const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+class Element {
+  constructor(tag = 'div') { this.tagName = tag; this.children = []; this.attrs = {}; this.dataset = {}; this.hidden = false; this.textContent = ''; this.className = ''; this.classList = { add: value => this.className += ' ' + value }; }
+  append(...nodes) { this.children.push(...nodes); }
+  replaceChildren(...nodes) { this.children = nodes; }
+  setAttribute(key, value) { this.attrs[key] = value; }
+  remove() { this.removed = true; }
+  focus() { this.focused = true; }
+  select() { this.selected = true; }
+  scrollIntoView() { this.scrolled = true; }
+}
+const walk = node => [node, ...node.children.flatMap(walk)];
+async function page(csv, opts = {}) {
+  const nodes = Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m => [m[1], new Element()]));
+  nodes.sort.value = 'priority';
+  nodes['copy-fallback'].hidden = true;
+  const root = new Element('html');
+  const errors = [];
+  const stored = {};
+  const copies = [];
+  let sharedClaims = [];
+  const context = vm.createContext({URL, URLSearchParams, crypto: require('node:crypto').webcrypto, setInterval: () => {}, console: { assert: (ok, msg) => {if (!ok) errors.push(msg);}, error: (...args) => errors.push(args)}, location: {href:'https://example.test/wishlist/', hash: opts.hash || ''}, document: {documentElement:root, createElement: tag => new Element(tag), getElementById: id => nodes[id] || walk(nodes.grid).find(n => n.id === id)}, window: { addEventListener: () => {} }, localStorage: {getItem: key => { if (opts.storageBlocked) throw Error(); return key === 'wishlist-theme' ? opts.theme : null; }, setItem: (k,v) => { if (opts.storageBlocked) throw Error(); stored[k] = v; }}, navigator: {clipboard: {writeText: async value => { if (opts.clipboardBlocked) throw Error(); copies.push(value); }}}, fetch: async (url, request) => { if (url === 'api/claims') { if (request?.method === 'POST') { const data = JSON.parse(request.body); sharedClaims = data.action === 'claim' ? [data.item] : []; } return {ok:true, json:async () => ({claims:sharedClaims})}; } assert.equal(url,'items.csv'); if (opts.fetchFailed) throw Error(); return {ok: true, text: async () => csv};}});
+  for (const script of scripts) vm.runInContext(script, context);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(errors, []);
+  return {nodes, root, stored, copies, run: code => vm.runInContext(code, context)};
+}
+(async () => {
+  const csv = fs.readFileSync('items.csv','utf8');
+  const legacyCSV = fs.readFileSync('tests/fixtures/legacy.csv','utf8');
+  const actual = await page(csv);
+  const legacy = await page(legacyCSV);
+  const actualItems = actual.run('readItems(' + JSON.stringify(csv) + ')');
+  const legacyItems = legacy.run('readItems(' + JSON.stringify(legacyCSV) + ')');
+  for (const key of ['name','price','note','link','image']) assert.equal(actualItems[0][key], legacyItems[0][key]);
+  assert.equal(actual.nodes.grid.children.length,1);
+  assert.equal(legacy.nodes.grid.children.length,1);
+  assert.equal(legacyItems[0].priority,2);
+  assert.equal(legacyItems[0].status,'');
+  assert.equal(legacyItems[0].category,'');
+  assert.equal(legacy.root.dataset.theme,undefined);
+  assert.equal(legacy.nodes.title.textContent,"Ryan's wishlist");
+  assert.ok(walk(actual.nodes.grid).some(n => n.className === 'ribbon'));
+  assert.ok(!walk(legacy.nodes.grid).some(n => n.className === 'ribbon'));
+  for (const cls of ['note','tag','product']) assert.equal(walk(actual.nodes.grid).find(n => n.className === cls).textContent, walk(legacy.nodes.grid).find(n => n.className === cls).textContent);
+  assert.equal(walk(actual.nodes.grid).find(n => n.tagName === 'img').src, legacyItems[0].image);
+  actual.nodes.theme.onclick(); assert.equal(actual.root.dataset.theme,'light'); assert.equal(actual.stored['wishlist-theme'],'light');
+  assert.equal((await page(csv,{theme:'light'})).root.dataset.theme,'light');
+  assert.equal((await page(csv,{theme:'unexpected'})).root.dataset.theme,undefined);
+  const blocked = await page(csv,{storageBlocked:true,clipboardBlocked:true});
+  blocked.nodes.theme.onclick(); assert.equal(blocked.root.dataset.theme,'light');
+  await blocked.run('copyLink("https://example.test/#item-test")');
+  assert.equal(blocked.nodes['copy-fallback'].hidden,false);
+  assert.equal(blocked.nodes['copy-value'].value,'https://example.test/#item-test');
+  const fixture = 'status,image,priority,category,link,note,price,name\r\n' +
+    'claimed,photo.jpg,1,Books,https://example.test,"Quoted, ""note""",$1,Claimed\r\n' +
+    ',,3,Home,,,any amount,Unknown\r\n' +
+    ',,2,Books,,,"$1,200.50",Expensive\r\n' +
+    ',,1,Books,,,~$30–50,Wanted\r\n' +
+    ',,2,Home,,,under $25,Cheap\r\n' +
+    'bought,photo.jpg,2,Home,,,any amount,Bought\r\n' +
+    ',,2,Home,,,€.75,Decimal\r\n';
+  const test = await page(fixture);
+  const names = () => test.nodes.grid.children.map(c => walk(c).find(n => n.tagName === 'h2').textContent);
+  assert.deepEqual(names(),['Wanted','Expensive','Cheap','Decimal','Unknown','Claimed','Bought']);
+  test.nodes.sort.value='low'; test.nodes.sort.onchange();
+  assert.deepEqual(names(),['Decimal','Cheap','Wanted','Expensive','Unknown','Claimed','Bought']);
+  test.nodes.sort.value='high'; test.nodes.sort.onchange();
+  assert.deepEqual(names(),['Expensive','Wanted','Cheap','Decimal','Unknown','Claimed','Bought']);
+  test.nodes.categories.children.find(c => c.textContent === 'Books').onclick();
+  assert.deepEqual(names(),['Expensive','Wanted','Claimed']);
+  assert.equal(test.nodes.categories.children.find(c => c.textContent === 'Books').attrs['aria-pressed'],'true');
+  test.nodes.categories.children[0].onclick();
+  for (const card of test.nodes.grid.children.filter(c => c.className.includes('unavailable'))) {
+    assert.ok(walk(card).some(n => n.className === 'stamp'));
+    assert.ok(!walk(card).some(n => n.className.includes('claim')));
+  }
+  assert.ok(html.includes('.card.unavailable img { filter: grayscale(1)'));
+  const copy = walk(actual.nodes.grid).find(n => n.className === 'copy');
+  await copy.onclick(); assert.equal(actual.copies[0],'https://example.test/wishlist/#item-majora-s-mask-wooden-replica');
+  const claimButton = walk(actual.nodes.grid).find(n => n.className === 'button claim');
+  assert.equal(claimButton.textContent, 'I might get this');
+  assert.equal(claimButton.disabled, false);
+  await claimButton.onclick();
+  assert.ok(walk(actual.nodes.grid).some(n => n.textContent === 'Possibly taken'));
+  const undoButton = walk(actual.nodes.grid).find(n => n.textContent === 'Undo my mark');
+  await undoButton.onclick();
+  assert.ok(!walk(actual.nodes.grid).some(n => n.textContent === 'Possibly taken'));
+  actual.run('CONFIG.contact = "mailto:ryan@example.test?cc=friend%40example.test"');
+  const mail = actual.run('contactURL("Gift & thanks")');
+  assert.equal(new URL(mail).searchParams.get('body'),'Gift & thanks');
+  assert.equal(new URL(mail).searchParams.get('subject'),"Ryan's wishlist");
+  assert.equal(new URL(mail).searchParams.get('cc'),'friend@example.test');
+  actual.run('CONFIG.shareURL = "https://example.test/Published/"');
+  assert.equal(actual.run('shareURL("item-gift")'),'https://example.test/Published/#item-gift');
+  const anchor = await page(fixture,{hash:'#item-wanted'});
+  assert.ok(anchor.nodes.grid.children.find(c => c.id === 'item-wanted').scrolled);
+  const duplicate = test.run('readItems("name\\nGift\\nGift\\nGift-2\\n🎁")');
+  assert.equal(new Set(duplicate.map(i => i.slug)).size,4);
+  assert.equal(test.run('parseCSV(\'a,"line 1\\nline 2",c\\r\\n\')[0][1]'),'line 1\nline 2');
+  const empty = await page('name,price,note,link,image\n'); assert.equal(empty.nodes.count.textContent,'No wishes just yet. Check back soon.');
+  const failed = await page('',{fetchFailed:true}); assert.ok(failed.nodes.count.textContent.startsWith("Couldn't load"));
+  console.log('PASS: owner data preserved; current and legacy five-column rendering; reordered headers; quoted/multiline CSV; priority and both price sorts; missing prices last; statuses last; ribbons/stamps; filters; theme default/persistence/storage denial; shared tentative claims/undo; optional mailto; clipboard/fallback; unique slugs/deep links; empty/failure states.');
+  console.log('Evidence: offline Node VM with a minimal DOM and stubbed CSV fetch. This is not browser/console or visual verification.');
+})().catch(error => { console.error(error); process.exitCode=1; });

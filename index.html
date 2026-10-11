@@ -1,189 +1,125 @@
 <!DOCTYPE html>
 <!--
-  Wishlist — Promethean Robotics version.
-  Based on Wishlist by Lickitysplitted (https://github.com/Lickitysplitted/Wishlist).
-  Modified by Promethean Robotics, 2026-10-11. Licensed GPL-3.0-or-later; see LICENSE.
+  Ryan's wishlist. Based on Wishlist by Lickitysplitted
+  (https://github.com/Lickitysplitted/Wishlist).
+  Modified by Promethean Robotics, 2026-10-11 (initial rebrand).
+  Modified by Ryan with Codex, 2026-10-11: Gift Tag design and wishlist controls.
+  Licensed GPL-3.0-or-later; see LICENSE.
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Promethean Robotics Wishlist</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;600;800&display=swap" rel="stylesheet">
-
+<script>
+// Personalize the site here. No build step required.
+const CONFIG = {
+  name: "Ryan's wishlist",
+  intro: "A few things I'd love, collected in one little list. Thinking of getting something? Mark it as possibly taken so nobody doubles up.",
+  contact: "", // Optional contact link, for example mailto:you@example.com.
+  shareURL: "" // Your public URL; blank uses the current page URL.
+};
+// Dark is always the default, regardless of the device's color preference.
+try {
+  if (localStorage.getItem("wishlist-theme") === "light") document.documentElement.dataset.theme = "light";
+} catch { /* Storage may be unavailable; the toggle still works for this visit. */ }
+</script>
+<title>Ryan's wishlist</title>
+<link rel="icon" href="data:,">
 <style>
   :root {
-    --ground: #eef0f2;     /* cool light gray page */
-    --card: #ffffff;
-    --ink: #21242a;
-    --muted: #6b7280;
-    --accent: #c2410c;     /* ember orange — Promethean Robotics */
-    --tag-paper: #faf6ec;  /* the little price tag */
+    color-scheme: dark;
+    --ground: #17151b; --card: #242027; --ink: #f7eff0; --muted: #c1b4bd;
+    --accent: #ff9ab6; --accent-solid: #932749; --accent-ink: #fff4f7;
+    --line: #493842; --wash: #33232d; --tag-paper: #f2dfbb; --tag-ink: #463528;
+    --shadow: 0 12px 36px #00000026;
   }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--ground);
-    color: var(--ink);
-    font-family: "Karla", sans-serif;
-    padding: 3rem 1.25rem 4rem;
-    min-height: 100vh;
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --ground: #faf5ef; --card: #fffdfa; --ink: #30232b; --muted: #73616b;
+    --accent: #9e3155; --accent-solid: #932749; --accent-ink: #fff4f7;
+    --line: #dfcdd2; --wash: #f5e6eb; --tag-paper: #f2dfbb; --tag-ink: #463528;
+    --shadow: 0 12px 36px #542d3510;
   }
-
-  header {
-    max-width: 620px;
-    margin: 0 auto 2.75rem;
-    text-align: center;
-  }
-
-  h1 {
-    font-size: clamp(2rem, 6vw, 3rem);
-    font-weight: 800;
-    letter-spacing: -0.02em;
-  }
-  h1 em {
-    font-style: normal;
-    color: var(--accent);
-  }
-
-  header p {
-    margin-top: 0.8rem;
-    color: var(--muted);
-    font-size: 1.05rem;
-    line-height: 1.55;
-  }
-  header p strong { color: var(--ink); }
-
-  .grid {
-    max-width: 1040px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1.5rem;
-  }
-
-  /* Items live in items.csv — see README.md for the format. */
-
-  .card {
-    background: var(--card);
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(33,36,42,0.08), 0 8px 24px rgba(33,36,42,0.07);
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-  }
-  .card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 2px 4px rgba(33,36,42,0.08), 0 14px 32px rgba(33,36,42,0.12);
-  }
-
-  .card img {
-    width: 100%;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
-    display: block;
-    background: var(--ground);
-  }
-
-  .card .body {
-    padding: 1.1rem 1.2rem 1.3rem;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-  }
-
-  .card h2 {
-    font-size: 1.15rem;
-    font-weight: 800;
-    line-height: 1.3;
-  }
-
-  .note {
-    margin-top: 0.4rem;
-    color: var(--muted);
-    font-size: 0.95rem;
-    line-height: 1.45;
-  }
-
-  /* signature: price as a tiny punched gift tag */
-  .tag {
-    align-self: flex-start;
-    margin-top: 0.85rem;
-    background: var(--tag-paper);
-    color: #5a5343;
-    font-weight: 600;
-    font-size: 0.85rem;
-    letter-spacing: 0.03em;
-    padding: 0.3rem 0.75rem 0.3rem 1.35rem;
-    border-radius: 4px 999px 999px 4px;
-    position: relative;
-    transform: rotate(-2deg);
-    box-shadow: 0 1px 2px rgba(33,36,42,0.15);
-  }
-  .tag::before {
-    content: "";
-    position: absolute;
-    left: 0.45rem; top: 50%;
-    width: 7px; height: 7px;
-    transform: translateY(-50%);
-    border-radius: 50%;
-    background: var(--card);
-    box-shadow: 0 0 0 2px #d9d1bc;
-  }
-
-  .card a {
-    margin-top: auto;
-    padding-top: 1rem;
-    align-self: flex-start;
-    color: var(--accent);
-    font-weight: 800;
-    font-size: 0.95rem;
-    text-decoration: none;
-  }
-  .card a:hover { text-decoration: underline; }
-  .card a:focus-visible {
-    outline: 3px solid var(--accent);
-    outline-offset: 3px;
-    border-radius: 4px;
-  }
-
-  footer {
-    max-width: 620px;
-    margin: 3rem auto 0;
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.95rem;
-  }
-  footer .credit {
-    margin-top: 0.5rem;
-    font-size: 0.85rem;
-  }
-  footer a { color: inherit; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .card { transition: none; }
-    .card:hover { transform: none; }
-  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: system-ui, sans-serif; line-height: 1.5; }
+  button, select, input { font: inherit; }
+  button, select, .button { min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: .6rem .95rem; background: var(--card); color: var(--ink); }
+  button, select { cursor: pointer; }
+  a { color: var(--accent); text-underline-offset: 4px; }
+  button:hover, .button:hover { border-color: var(--accent); }
+  button:disabled { cursor: wait; opacity: .6; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+  .shell { max-width: 1120px; margin: auto; padding: 0 28px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 24px; }
+  .wordmark, .eyebrow { font-size: .72rem; text-transform: uppercase; letter-spacing: .19em; font-weight: 700; }
+  .wordmark { color: var(--muted); }
+  .wordmark span { color: var(--accent); margin-right: .6rem; font-size: 1.1rem; }
+  .topbar button { background: transparent; font-size: .8rem; }
+  header { padding: 58px 0 42px; max-width: 750px; }
+  .eyebrow { color: var(--accent); margin: 0 0 14px; }
+  h1 { font-family: Georgia, serif; font-size: clamp(2.7rem, 7vw, 4.7rem); font-weight: 400; letter-spacing: -.055em; line-height: 1.06; margin: 0; overflow-wrap: anywhere; }
+  .intro { max-width: 580px; color: var(--muted); font-size: 1.05rem; margin: 22px 0; }
+  .header-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .header-actions a { font-size: .9rem; padding: .5rem 0; }
+  .toolbar { border-top: 1px solid var(--line); padding: 25px 0 18px; display: flex; justify-content: space-between; gap: 20px; align-items: center; flex-wrap: wrap; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { border-radius: 999px; font-size: .85rem; overflow-wrap: anywhere; max-width: 100%; }
+  .chip[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--wash); }
+  .sort { display: flex; align-items: center; gap: 10px; font-size: .8rem; color: var(--muted); }
+  select { font-size: .85rem; }
+  .count { color: var(--muted); margin: 0 0 20px; font-size: .8rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 24px; align-items: stretch; }
+  .card { min-width: 0; position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; scroll-margin-top: 24px; }
+  .card:target { outline: 3px solid var(--accent); outline-offset: 5px; }
+  .card img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--wash); }
+  .card.unavailable img { filter: grayscale(1); opacity: .6; }
+  .ribbon { position: absolute; top: 16px; left: 0; z-index: 1; background: var(--accent-solid); color: var(--accent-ink); padding: 7px 18px 7px 13px; font-size: .7rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%); }
+  .card.no-image .ribbon { position: static; align-self: flex-start; margin-top: 16px; }
+  .body { padding: 22px; display: flex; flex-direction: column; flex: 1; align-items: flex-start; overflow-wrap: anywhere; }
+  .category { color: var(--accent); font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 9px; }
+  h2 { font-family: Georgia, serif; font-size: 1.55rem; font-weight: 400; line-height: 1.22; margin: 0; }
+  .note { color: var(--muted); font-size: .88rem; margin: 12px 0 0; white-space: pre-line; }
+  .tag { margin: 20px 0 24px; background: var(--tag-paper); color: var(--tag-ink); font-weight: 700; font-size: .82rem; padding: 7px 16px 7px 29px; border-radius: 4px 999px 999px 4px; position: relative; transform: rotate(-3deg); max-width: 100%; }
+  .tag::before { content: ""; position: absolute; left: 11px; top: 50%; width: 6px; height: 6px; transform: translateY(-50%); border-radius: 50%; background: var(--card); box-shadow: 0 0 0 2px #c3ac89; }
+  .stamp { display: inline-block; border: 2px solid var(--muted); color: var(--muted); border-radius: 4px; padding: 3px 10px; text-transform: uppercase; font-size: .75rem; font-weight: 750; letter-spacing: .1em; transform: rotate(-5deg); margin: 0 0 18px; }
+  .actions { margin-top: auto; width: 100%; padding-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-top: 1px solid var(--line); }
+  .actions .product { width: 100%; padding-bottom: 5px; font-size: .86rem; text-decoration: none; }
+  .button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: .8rem; font-weight: 650; }
+  .claim { background: var(--accent-solid); border-color: var(--accent-solid); color: var(--accent-ink); flex: 1; }
+  .copy { font-size: .78rem; }
+  .copy-fallback { margin-top: 16px; color: var(--muted); font-size: .85rem; }
+  .copy-fallback input { width: 100%; margin-top: 8px; cursor: text; }
+  .notice { margin: 0; color: var(--accent); font-size: .85rem; }
+  .notice:not(:empty) { padding: 16px 0; }
+  footer { border-top: 1px solid var(--line); margin-top: 52px; padding: 26px 0 32px; color: var(--muted); font-size: .78rem; }
+  footer p { margin: 5px 0; }
+  footer .thanks { color: var(--ink); font-family: Georgia, serif; font-style: italic; font-size: 1.15rem; margin-bottom: 12px; }
+  [hidden] { display: none !important; }
+  @media (max-width: 520px) { .shell { padding: 0 20px; } header { padding-top: 38px; } .toolbar { gap: 16px; } .sort { width: 100%; justify-content: space-between; } }
 </style>
 </head>
 <body>
-
-<header>
-  <h1>Promethean Robotics <em>Wishlist</em></h1>
-  <p>
-    Parts, tools and gear we'd love to have.
-    <strong>If you pick something up, let us know first so nobody doubles up!</strong>
-  </p>
-</header>
-
-<main class="grid" id="grid">
-  <noscript><p>This list needs JavaScript to load — or open <a href="items.csv">items.csv</a> directly.</p></noscript>
-</main>
-
+<div class="shell">
+  <div class="topbar"><span class="wordmark"><span aria-hidden="true">✳</span>A little wishful thinking</span><button id="theme" type="button" aria-pressed="false">Light theme</button></div>
+  <header>
+    <p class="eyebrow">Picked with care · Given with love</p>
+    <h1 id="title"></h1>
+    <p class="intro" id="intro"></p>
+    <div class="header-actions"><button id="share" type="button">Copy wishlist link ↗</button><a id="contact">Get in touch →</a></div>
+  </header>
+  <main>
+    <div class="toolbar" id="controls" hidden>
+      <div class="chips" id="categories" role="group" aria-label="Filter by category"></div>
+      <label class="sort">Sort by <select id="sort"><option value="priority">Most wanted</option><option value="low">Price low → high</option><option value="high">Price high → low</option></select></label>
+    </div>
+    <p class="count" id="count" role="status">Loading the wishlist…</p>
+    <p class="notice" id="notice" role="status"></p>
+    <label class="copy-fallback" id="copy-fallback" hidden>Copy this link manually:<input id="copy-value" readonly></label>
+    <div class="grid" id="grid"></div>
+    <noscript><p>This list needs JavaScript to load — or open <a href="items.csv">items.csv</a> directly.</p></noscript>
+  </main>
+  <footer><p class="thanks">It's the thought that counts. Thank you.</p><p>Based on <a href="https://github.com/Lickitysplitted/Wishlist">Wishlist</a> by Lickitysplitted · <a href="LICENSE">GPL-3.0</a></p><p>Modified by Ryan with Codex · 2026-10-11</p></footer>
+</div>
 <script>
 // Minimal RFC-4180-ish CSV parser: handles quoted fields, "" escapes, CRLF.
 function parseCSV(text) {
@@ -203,69 +139,235 @@ function parseCSV(text) {
   rows.at(-1).push(field);
   return rows.filter(r => r.some(f => f.trim() !== ""));
 }
-
-// ponytail: one self-check that fails loudly if the parser breaks
 console.assert(
-  JSON.stringify(parseCSV('a,"b, ""q""",c\r\nd,,e')) === '[["a","b, \\"q\\"","c"],["d","","e"]]',
+  JSON.stringify(parseCSV('a,"b, ""q""",c\r\nd,,e')) === JSON.stringify([["a", 'b, "q"', "c"], ["d", "", "e"]]),
   "CSV parser self-check failed"
 );
 
+const $ = id => document.getElementById(id);
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+function shareURL(slug = "") {
+  let url;
+  try { url = new URL(CONFIG.shareURL || location.href, location.href); }
+  catch { url = new URL(location.href); }
+  if (!/^https?:$/.test(url.protocol)) url = new URL(location.href);
+  url.hash = slug;
+  return url.href;
+}
+function contactURL(message) {
+  const target = CONFIG.contact.trim();
+  if (!/^(sms:|mailto:)/i.test(target)) return "";
+  const [address, query = ""] = target.split("?");
+  const params = new URLSearchParams(query);
+  if (/^mailto:/i.test(target)) params.set("subject", CONFIG.name);
+  params.set("body", message);
+  return address + "?" + params.toString().replace(/\+/g, "%20");
+}
+async function copyLink(url) {
+  $("copy-fallback").hidden = true;
+  try {
+    await navigator.clipboard.writeText(url);
+    $("notice").textContent = "Link copied. A little hint, ready to share.";
+  } catch {
+    $("notice").textContent = "Couldn't copy automatically. You can copy the link below.";
+    $("copy-fallback").hidden = false;
+    $("copy-value").value = url;
+    $("copy-value").focus();
+    $("copy-value").select();
+  }
+}
+function updateThemeButton() {
+  const light = document.documentElement.dataset.theme === "light";
+  $("theme").textContent = light ? "Dark theme" : "Light theme";
+  $("theme").setAttribute("aria-pressed", String(light));
+  $("theme").setAttribute("aria-label", light ? "Switch to dark theme" : "Switch to light theme");
+}
+$("theme").onclick = () => {
+  const theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem("wishlist-theme", theme); } catch { /* Optional persistence. */ }
+  updateThemeButton();
+};
+updateThemeButton();
+document.title = CONFIG.name;
+$("title").textContent = CONFIG.name;
+$("intro").textContent = CONFIG.intro;
+const contact = contactURL(`Hi! I had a question about ${CONFIG.name}: ${shareURL()}`);
+$("contact").hidden = !contact;
+if (contact) $("contact").href = contact;
+$("share").onclick = () => copyLink(shareURL());
+
+function priceNumber(price) {
+  // First number, including comma-grouped thousands and decimal prices.
+  const match = price.match(/\d[\d,]*(?:\.\d+)?|\.\d+/);
+  return match ? Number(match[0].replace(/,/g, "")) : null;
+}
+function readItems(text) {
+  const [header = [], ...rows] = parseCSV(text);
+  if (!header.some(h => h.trim() === "name")) throw new Error("Missing name column");
+  const ids = new Set();
+  return rows.map((row, index) => {
+    const item = Object.fromEntries(header.map((h, i) => [h.trim(), (row[i] || "").trim()]));
+    item.category = item.category || "";
+    item.priority = ["1", "3"].includes(item.priority) ? Number(item.priority) : 2;
+    item.status = ["claimed", "bought"].includes(item.status) ? item.status : "";
+    item.amount = priceNumber(item.price || "");
+    item.index = index;
+    const base = "item-" + ((item.name || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "gift");
+    item.slug = base;
+    let suffix = 2;
+    while (ids.has(item.slug)) item.slug = `${base}-${suffix++}`;
+    ids.add(item.slug);
+    return item;
+  }).filter(item => item.name);
+}
+function compareItems(a, b, sort) {
+  const status = Number(Boolean(a.status)) - Number(Boolean(b.status));
+  if (status) return status;
+  if (sort === "priority") return a.priority - b.priority || a.index - b.index;
+  if (a.amount === null || b.amount === null) return Number(a.amount === null) - Number(b.amount === null) || a.index - b.index;
+  return (sort === "low" ? a.amount - b.amount : b.amount - a.amount) || a.index - b.index;
+}
+let claims = [], claimsReady = false, pendingClaim = "";
+let claimTokens = {};
+try { claimTokens = JSON.parse(localStorage.getItem("wishlist-claims") || "{}"); } catch { /* Session-only undo when storage is blocked. */ }
+if (!claimTokens || typeof claimTokens !== "object" || Array.isArray(claimTokens)) claimTokens = {};
+function saveClaimTokens() {
+  try { localStorage.setItem("wishlist-claims", JSON.stringify(claimTokens)); } catch { /* Keep tokens in memory for this visit. */ }
+}
+async function refreshClaims() {
+  try {
+    const response = await fetch("api/claims", { cache: "no-store" });
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    if (!Array.isArray(data.claims)) throw new Error();
+    const changed = !claimsReady || JSON.stringify(claims) !== JSON.stringify(data.claims);
+    claims = data.claims;
+    claimsReady = true;
+    if (changed) render();
+  } catch {
+    if (claimsReady) { claimsReady = false; render(); }
+  }
+}
+async function changeClaim(item, release = false) {
+  if (pendingClaim) return;
+  pendingClaim = item.slug;
+  if (!claimTokens[item.slug]) claimTokens[item.slug] = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
+  saveClaimTokens();
+  render();
+  try {
+    const response = await fetch("api/claims", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item: item.slug, token: claimTokens[item.slug], action: release ? "release" : "claim" })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 409 || response.status === 403) { delete claimTokens[item.slug]; saveClaimTokens(); }
+      throw new Error(data.error || "Couldn't save that change. Please try again.");
+    }
+    claims = data.claims;
+    claimsReady = true;
+    if (release) { delete claimTokens[item.slug]; saveClaimTokens(); }
+    $("notice").textContent = release ? "Back on the wishlist. Thanks for letting us know." : "Marked as possibly taken. Changed your mind? You can undo this here.";
+  } catch (error) {
+    $("notice").textContent = error.message || "Couldn't save that change. Please try again.";
+    await refreshClaims();
+  } finally { pendingClaim = ""; render(); }
+}
+function makeCard(item) {
+  const card = element("article", "card" + (item.status ? " unavailable" : "") + (!item.image ? " no-image" : ""));
+  card.id = item.slug;
+  card.setAttribute("aria-labelledby", item.slug + "--heading");
+  if (item.priority === 1) card.append(element("span", "ribbon", "Most wanted"));
+  if (item.image) {
+    const img = element("img", "");
+    img.src = item.image;
+    img.alt = "";
+    img.onerror = () => { img.remove(); card.classList.add("no-image"); };
+    card.append(img);
+  }
+  const body = element("div", "body");
+  if (item.category) body.append(element("p", "category", item.category));
+  const title = element("h2", "", item.name);
+  title.id = item.slug + "--heading";
+  body.append(title);
+  if (item.note) body.append(element("p", "note", item.note));
+  if (item.price) body.append(element("span", "tag", item.price));
+  if (item.status) body.append(element("span", "stamp", item.status === "tentative" ? "Possibly taken" : item.status));
+  const actions = element("div", "actions");
+  if (/^https?:\/\//i.test(item.link)) {
+    const link = element("a", "product", "View item ↗");
+    link.href = item.link;
+    link.target = "_blank";
+    link.rel = "noopener";
+    actions.append(link);
+  }
+  const canUndo = item.status === "tentative" && Boolean(claimTokens[item.slug]);
+  if (!item.status || canUndo) {
+    const claim = element("button", "button claim", canUndo ? "Undo my mark" : "I might get this");
+    claim.type = "button";
+    claim.disabled = !claimsReady || Boolean(pendingClaim);
+    if (!claimsReady) claim.title = "Live status is unavailable. Please try again shortly.";
+    claim.onclick = () => changeClaim(item, canUndo);
+    actions.append(claim);
+  }
+  const copy = element("button", "copy", "Copy link");
+  copy.type = "button";
+  copy.setAttribute("aria-label", `Copy link to ${item.name}`);
+  copy.onclick = () => copyLink(shareURL(item.slug));
+  actions.append(copy);
+  body.append(actions);
+  card.append(body);
+  return card;
+}
+let items = [], category = null;
+function render() {
+  const visible = items.map(item => ({ ...item, status: item.status || (claims.includes(item.slug) ? "tentative" : "") }))
+    .filter(item => category === null || item.category === category).sort((a, b) => compareItems(a, b, $("sort").value));
+  $("grid").replaceChildren(...visible.map(makeCard));
+  $("count").textContent = `${visible.length} ${visible.length === 1 ? "wish" : "wishes"}${category !== null ? ` in ${category}` : " on the list"} · A little inspiration, never an obligation.`;
+  if (!items.length) $("count").textContent = "No wishes just yet. Check back soon.";
+}
+function setCategory(value) {
+  category = value;
+  for (const chip of $("categories").children) chip.setAttribute("aria-pressed", String(chip.category === value));
+  render();
+}
+function revealAnchor() {
+  let id;
+  try { id = decodeURIComponent(location.hash.slice(1)); } catch { return; }
+  if (!items.some(item => item.slug === id)) return;
+  if (!$(id)) setCategory(null);
+  $(id).scrollIntoView({ block: "start" });
+}
+$("sort").onchange = render;
+window.addEventListener("hashchange", revealAnchor);
 fetch("items.csv")
   .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
   .then(text => {
-    const [header, ...rows] = parseCSV(text);
-    const grid = document.getElementById("grid");
-    for (const row of rows) {
-      const item = Object.fromEntries(header.map((h, i) => [h.trim(), (row[i] || "").trim()]));
-      if (!item.name) continue;
-      const card = document.createElement("article");
-      card.className = "card";
-      if (item.image) {
-        const img = document.createElement("img");
-        img.src = item.image;
-        img.alt = "";
-        img.onerror = () => img.remove();
-        card.append(img);
-      }
-      const body = document.createElement("div");
-      body.className = "body";
-      const h2 = document.createElement("h2");
-      h2.textContent = item.name;
-      body.append(h2);
-      if (item.note) {
-        const note = document.createElement("p");
-        note.className = "note";
-        note.textContent = item.note;
-        body.append(note);
-      }
-      if (item.price) {
-        const tag = document.createElement("span");
-        tag.className = "tag";
-        tag.textContent = item.price;
-        body.append(tag);
-      }
-      if (/^https?:\/\//i.test(item.link)) {
-        const a = document.createElement("a");
-        a.href = item.link;
-        a.target = "_blank";
-        a.rel = "noopener";
-        a.textContent = "View item →";
-        body.append(a);
-      }
-      card.append(body);
-      grid.append(card);
+    items = readItems(text);
+    for (const value of [null, ...new Set(items.map(item => item.category).filter(Boolean))]) {
+      const chip = element("button", "chip", value === null ? "All wishes" : value);
+      chip.type = "button";
+      chip.category = value;
+      chip.setAttribute("aria-pressed", String(value === null));
+      chip.onclick = () => setCategory(value);
+      $("categories").append(chip);
     }
+    $("controls").hidden = false;
+    render();
+    refreshClaims().then(revealAnchor);
+    setInterval(() => { if (!document.hidden && !pendingClaim) refreshClaims(); }, 15000);
+    window.addEventListener("focus", refreshClaims);
   })
   .catch(() => {
-    document.getElementById("grid").innerHTML =
-      "<p>Couldn't load items.csv — if you opened this file directly, run it from a web server (it works fine on GitHub Pages).</p>";
+    $("count").textContent = "Couldn't load items.csv. Check the file and its name header, and serve this page through a web server (or GitHub Pages).";
   });
 </script>
-
-<footer>
-  <p>Thanks for supporting Promethean Robotics ♥ — updated whenever we think of something new.</p>
-  <p class="credit">Based on <a href="https://github.com/Lickitysplitted/Wishlist">Wishlist</a> by Lickitysplitted · GPL-3.0</p>
-</footer>
-
 </body>
 </html>
